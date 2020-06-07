@@ -1,13 +1,16 @@
 
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:flutter/cupertino.dart';
 
 import 'package:flutterapp/models/login_response.dart';
 import 'package:flutterapp/screens/signup_screen.dart';
 import 'globals.dart' as globals;
 import 'package:flutterapp/services/services.dart';
 import 'package:flutterapp/models/login.dart';
-import 'package:flutterapp/landingPage.dart';
+import 'package:flutterapp/permission/contact.dart';
+import 'file:///C:/Users/knowp/AndroidStudioProjects/flutter_app/lib/screens/landingPage.dart';
 
 void main() {
   runApp(MaterialApp(
@@ -24,6 +27,7 @@ class _State extends State<MyApp> {
   TextEditingController nameController = TextEditingController();
   TextEditingController passwordController = TextEditingController();
   final GlobalKey<ScaffoldState> _scaffoldKey = new GlobalKey<ScaffoldState>();
+  String errorMessage = "";
 
   loginAPI(){
     LoginResponse loginResponse;
@@ -31,25 +35,40 @@ class _State extends State<MyApp> {
       username: nameController.text,
       password: passwordController.text
     );
-    createPost(login).then((response) => {
+    String url = 'https://gentle-bayou-08991.herokuapp.com/users/login';
+    createPost(url, login).then((response) => {
         if(response.statusCode == 200){
           loginResponse = postFromJson(response.body),
+          globals.globalLoginResponse = loginResponse,
           print(loginResponse),
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (BuildContext context) => LandingPage(),
-            ))
+          //getContactAccess(),
+          checkContactAccess().then((status) => {
+            if(status){
+              Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (BuildContext context) => LandingPage(),
+                  ))
+            }
+            else{
+              errorMessage = "Please provide permission to access contacts to proceed further",
+              showLErrorMessage(errorMessage),
+            }
+          }),
+
         }
         else{
           print(response.statusCode),
-          showLoginFailureMessage()
+          errorMessage = "Login Failed, please recheck the details",
+          showLErrorMessage(errorMessage),
         }
       });
   }
-  showLoginFailureMessage(){
+
+
+  showLErrorMessage(String errorMessage){
     Fluttertoast.showToast(
-        msg: "Login Failed, please recheck the details",
+        msg: errorMessage,
         toastLength: Toast.LENGTH_SHORT,
         gravity: ToastGravity.BOTTOM,
         timeInSecForIos: 1,
