@@ -23,7 +23,7 @@ class PhoneNumbers {
 }
 
 class Numbers{
-  int number;
+  String number;
 
   Numbers({this.number});
 

@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'dart:convert';
-
+import 'package:flutterapp/helpers/SocketUtils.dart';
 import 'package:contacts_service/contacts_service.dart';
 import 'package:flutterapp/models/phonenumbers_post.dart';
-import 'package:flutterapp/models/login_response.dart';
+import 'package:flutterapp/models/conversation_post.dart';
+import 'package:flutterapp/globals.dart' as globals;
 import 'package:flutterapp/models/valid_users.dart';
 import 'package:flutterapp/services/services.dart';
+import 'package:flutterapp/screens/chatscreen.dart';
+import 'package:flutterapp/persistance/shared_preference.dart';
 
 class LandingPage extends StatefulWidget {
   @override
@@ -20,50 +23,120 @@ class LandingPageState extends State<LandingPage> {
   PhoneNumbers phoneNumbersType = PhoneNumbers();
   List<ValidUser> validUserList = new List();
   var validUserMap = new Map();
+  var phoneToUserIdMap = new Map();
+  var userIdConversationMap = new Map();
+  var currentConversationId;
+  bool _connectedToSocket;
+  String _errorConnectMessage;
 
   @override
   void initState() {
-    getContacts();
+    getAllRegiesterdUser();
     print("got contacts");
     super.initState();
-  }
-
-  void loop(List<Contact> contactsList, List<Numbers> phoneNumbers) {
-    for (int i=0; i< contactsList.length; i++) {
-      String val = contactsList[i].phones.first.value.toString();
-      print(val);
-      phoneNumbers.add(Numbers(number: int.parse(val)));
+    globals.Socket.initSocket();
+    if(null == globals.Socket.socketUtils.getSocketIO()){
+      globals.Socket.socketUtils.connectSocket();
     }
   }
 
-  Future<void> getContacts() async {
-    //Make sure we already have permissions for contacts when we get to this
-    //page, so we can just retrieve it
-    final Iterable<Contact> contacts = await ContactsService.getContacts();
-    setState(() {
-      _contacts = contacts;
-      List<Contact> contactsList = _contacts.toList();
-      loop(contactsList, phoneNumbers);
-      phoneNumbersType = PhoneNumbers(phone : phoneNumbers);
-      getRegisteredNumbers(phoneNumbersType);
-    });
-  }
-
-  getRegisteredNumbers(PhoneNumbers phoneNumbersType){
-    String url = 'https://gentle-bayou-08991.herokuapp.com/users/findActiveUsers';
-    createPostUser(url, phoneNumbersType).then((response) => {
+  getAllRegiesterdUser(){
+    String url = globals.url+'/users';
+    getUsers(url).then((response) => {
       print(response.body),
       if(response.statusCode == 200){
         setState(() {
-          Iterable list = json.decode(response.body);
-          validUserList = list.map((model) => ValidUser.fromJson(model)).toList();
-          print(validUserList);
-          validUserMap = validUserList.asMap();
+          savePreference('userList', response.body);
+          validUserMap =getValidUsersMap(response.body);
           print(validUserMap[0].firstname.toString());
           int a =10;
         }),
       }
     });
+  }
+
+  Map getValidUsersMap(String responseBody){
+    Iterable list = json.decode(responseBody);
+    validUserList = list.map((model) => ValidUser.fromJson(model)).toList();
+    return validUserList.asMap();
+  }
+
+  checkIfConversationExistOrCreateConversation(index){
+    Participant currentUser = new Participant(participant : globals.globalLoginResponse.userId);
+    Participant otherUser = new Participant(participant : validUserMap[index].userId);
+    globals.otherUser = validUserMap[index];
+
+    readPreference('userIdConversationMap').then((value) => {
+      if(null != value && value.length>0){
+        userIdConversationMap = json.decode(value),
+        if(userIdConversationMap.containsKey(validUserMap[index].userId)){
+          currentConversationId = userIdConversationMap[validUserMap[index].userId],
+          globals.currentConversationId = currentConversationId,
+
+          Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (BuildContext context) => ChatScreen(),
+              ))
+        }
+        else{
+          getOrCreateConversation(currentUser, otherUser, index),
+        }
+      }
+      else{
+        getOrCreateConversation(currentUser, otherUser, index),
+      }
+    });
+  }
+  initSocket(){
+    globals.Socket.initSocket();
+    globals.Socket.socketUtils.connectSocket();
+  }
+  getOrCreateConversation(Participant currentUser, Participant otherUser, int index){
+    List<Participant> participantList = new List();
+    participantList.add(currentUser);
+    participantList.add(otherUser);
+    Conversation conversation = Conversation(participants: participantList);
+    String url = globals.url+'/conversations/findConversationForUsers';
+    createPostConversation(url, conversation, globals.globalLoginResponse.token).then((response) => {
+      print(response.body),
+      if(response.statusCode == 200 && response.body.length>10){
+        setState(() {
+          Iterable list = json.decode(response.body);
+          Map intermediateMap = list.toList().asMap()[0];
+          String conversationId = intermediateMap["_id"];
+          globals.currentConversationId = conversationId;
+          userIdConversationMap.putIfAbsent(validUserMap[index].userId, () => conversationId);
+          savePreference('userIdConversationMap', jsonEncode(userIdConversationMap));
+        }),
+        Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (BuildContext context) => ChatScreen(),
+            ))
+      }
+      else{
+        url =  globals.url+'/conversations',
+        createPostConversation(url, conversation, globals.globalLoginResponse.token).then((response) => {
+          print(response.body),
+          if(response.statusCode == 200){
+            setState(() {
+              Iterable list = json.decode(response.body);
+              Map intermediateMap = list.toList().asMap()[0];
+              String conversationId = intermediateMap["_id"];
+              globals.currentConversationId = conversationId;
+              userIdConversationMap.putIfAbsent(validUserMap[index].userId, () => conversationId);
+              savePreference('userIdConversationMap', jsonEncode(userIdConversationMap));
+            }),
+          }
+        }),
+      }
+    });
+  }
+
+  populatephoneToUserIdMap(Map validUserMap){
+    for(int i=0;i<validUserMap.length;i++){
+      phoneToUserIdMap.putIfAbsent(validUserMap[i].phone.toString(), () => validUserMap[i].userId.toString());
+    }
+    savePreference('validUsersPhoneToIdMap', jsonEncode(phoneToUserIdMap));
   }
 
   Widget build(BuildContext context) {
@@ -81,7 +154,9 @@ class LandingPageState extends State<LandingPage> {
             return Card(
               child: ListTile(
                 title: Text(validUserMap[index].firstname.toString()),
-                leading: Icon(Icons.wb_sunny),
+                leading: Icon(Icons.account_circle),
+              onTap: () =>
+                  checkIfConversationExistOrCreateConversation(index)
               ),
             );
           },
@@ -91,35 +166,4 @@ class LandingPageState extends State<LandingPage> {
   }
 }
 
-class BodyLayout extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return _myListView(context);
-  }
-}
 
-// replace this function with the code in the examples
-Widget _myListView(BuildContext context) {
-
-  // backing data
-  final europeanCountries = ['Albania', 'Andorra', 'Armenia', 'Austria',
-    'Azerbaijan', 'Belarus', 'Belgium', 'Bosnia and Herzegovina', 'Bulgaria',
-    'Croatia', 'Cyprus', 'Czech Republic', 'Denmark', 'Estonia', 'Finland',
-    'France', 'Georgia', 'Germany', 'Greece', 'Hungary', 'Iceland', 'Ireland',
-    'Italy', 'Kazakhstan', 'Kosovo', 'Latvia', 'Liechtenstein', 'Lithuania',
-    'Luxembourg', 'Macedonia', 'Malta', 'Moldova', 'Monaco', 'Montenegro',
-    'Netherlands', 'Norway', 'Poland', 'Portugal', 'Romania', 'Russia',
-    'San Marino', 'Serbia', 'Slovakia', 'Slovenia', 'Spain', 'Sweden',
-    'Switzerland', 'Turkey', 'Ukraine', 'United Kingdom', 'Vatican City'];
-
-  return ListView.builder(
-    itemCount: europeanCountries.length,
-    itemBuilder: (context, index) {
-      return ListTile(
-        title: Text(europeanCountries[index]),
-        leading: Icon(Icons.wb_sunny),
-      );
-    },
-  );
-
-}
