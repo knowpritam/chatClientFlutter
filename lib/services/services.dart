@@ -1,3 +1,4 @@
+import 'package:flutterapp/models/signup_post.dart';
 import 'package:http/http.dart' as http;
 import 'dart:async';
 import 'package:flutterapp/models/login.dart';
@@ -41,6 +42,17 @@ Future<http.Response> createPostConversation(String url, Conversation post, Stri
         HttpHeaders.authorizationHeader : 'bearer ' +authToken,
       },
       body: postToJsonConversation(post)
+  );
+  return response;
+}
+
+Future<http.Response> createUser(String url, SignupModel post) async {
+  String postPayload = postToJsonSignup(post);
+  final response = await http.post('$url',
+      headers: {
+        HttpHeaders.contentTypeHeader: 'application/json',
+      },
+      body: postPayload
   );
   return response;
 }

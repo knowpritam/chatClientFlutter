@@ -37,6 +37,8 @@ dependencies:
   flutter_socket_io: ^0.6.0
   scoped_model: ^1.0.1
   adhara_socket_io: ^0.4.1
+  sqflite: "^0.11.0"
+  path_provider: ^0.4.0
 
 dev_dependencies:
   flutter_test:

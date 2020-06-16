@@ -10,6 +10,7 @@ import 'package:flutterapp/services/services.dart';
 import 'package:flutterapp/models/login.dart';
 import 'package:flutterapp/models/valid_users.dart';
 import 'package:flutterapp/helpers/SocketUtils.dart';
+import 'package:flutterapp/helpers/ErrorMessageHelper.dart';
 import 'package:flutterapp/persistance/shared_preference.dart';
 import 'file:///C:/Users/knowp/AndroidStudioProjects/flutter_app/lib/screens/landingPage.dart';
 
@@ -45,7 +46,7 @@ class LoginPageState extends State<LoginPage> {
         loginResponse = postFromJson(response.body),
         globals.globalLoginResponse = loginResponse,
         loggedInUser = new ValidUser(userId: loginResponse.userId, firstname: loginResponse.firstname, lastname: loginResponse.lastname,
-            online: false, username: loginResponse.firstname, phone: "2"),
+             username: loginResponse.firstname, phone: "2"),
         globals.loggedInUser = loggedInUser,
         print(loginResponse),
         initSocket(),
@@ -85,17 +86,6 @@ class LoginPageState extends State<LoginPage> {
     globals.Socket.socketUtils.connectSocket();
   }
 
-  showErrorMessage(String errorMessage){
-    Fluttertoast.showToast(
-        msg: errorMessage,
-        toastLength: Toast.LENGTH_SHORT,
-        gravity: ToastGravity.BOTTOM,
-        timeInSecForIos: 1,
-        backgroundColor: Colors.black,
-        textColor: Colors.white,
-        fontSize: 16.0
-    );
-  }
 
   @override
   Widget build(BuildContext context) {

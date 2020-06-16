@@ -33,7 +33,11 @@ class _State extends State<MyApp> {
         globals.globalLoginResponse = loginResponse,
         if(loginResponse.token != null){
           // User already logged in
-
+          globals.Socket.initSocket(),
+          if(null == globals.Socket.socketUtils.getSocketIO()){
+            globals.Socket.socketUtils.connectSocket(),
+          },
+          Navigator.pop(context, true),
           Navigator.push(
             context,
             MaterialPageRoute(
@@ -42,6 +46,7 @@ class _State extends State<MyApp> {
         }
       }
       else{
+        Navigator.pop(context, true),
         Navigator.push(
             context,
             MaterialPageRoute(
