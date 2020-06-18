@@ -43,6 +43,8 @@ class LoginPageState extends State<LoginPage> {
     createPost(url, login).then((response) => {
       if(response.statusCode == 200){
         savePreference('loginResponse', response.body),
+        savePreference('showMessageOnChatTab', 'true'),
+        globals.showMessageOnChatTab= true,
         loginResponse = postFromJson(response.body),
         globals.globalLoginResponse = loginResponse,
         loggedInUser = new ValidUser(userId: loginResponse.userId, firstname: loginResponse.firstname, lastname: loginResponse.lastname,
@@ -121,7 +123,7 @@ class LoginPageState extends State<LoginPage> {
                     controller: nameController,
                     decoration: InputDecoration(
                       contentPadding: EdgeInsets.fromLTRB(20.0, 15.0, 20.0, 15.0),
-                      hintText: "User Name",
+                      labelText: "Username",
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(32.0)),
                     ),
                   ),
@@ -133,7 +135,7 @@ class LoginPageState extends State<LoginPage> {
                     controller: passwordController,
                     decoration: InputDecoration(
                       contentPadding: EdgeInsets.fromLTRB(20.0, 15.0, 20.0, 15.0),
-                      hintText: "Password",
+                      labelText: "Password",
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(32.0)),
                     ),
                   ),

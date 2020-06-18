@@ -6,6 +6,7 @@ import 'package:flutterapp/models/valid_users.dart';
 import 'package:path/path.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:sqflite/sqflite.dart';
+import 'package:flutterapp/globals.dart' as globals;
 
 class DatabaseHelper {
   static final DatabaseHelper _instance = new DatabaseHelper.internal();
@@ -33,7 +34,7 @@ class DatabaseHelper {
     await db.execute(
         "CREATE TABLE IF NOT EXISTS chat_messages(chatId TEXT,toId TEXT, fromId TEXT, fromName TEXT, toName TEXT, messageText TEXT, chatType TEXT, timeStamp TEXT, created_at DATETIME DEFAULT CURRENT_TIMESTAMP);");
     await db.execute(
-        "CREATE TABLE IF NOT EXISTS valid_users(userId TEXT,firstname TEXT, lastname TEXT, username TEXT, phone TEXT, numOfMessages INTEGER, lastMessage, created_at DATETIME DEFAULT CURRENT_TIMESTAMP,  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP);");
+        "CREATE TABLE IF NOT EXISTS valid_users(userId TEXT,firstname TEXT, lastname TEXT, username TEXT, phone TEXT, numOfMessages INTEGER, lastMessage TEXT, created_at DATETIME DEFAULT CURRENT_TIMESTAMP,  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP);");
 
   }
 
@@ -45,9 +46,9 @@ class DatabaseHelper {
 
   Future<List<ChatMessageModel>> getMessagesForChat(String chatId) async {
     var dbClient = await db;
-    List<Map> list = await dbClient.rawQuery('SELECT * FROM chat_messages where chatId = "${chatId}" order by created_at asc');
+    List<Map> list = await dbClient.rawQuery('SELECT * FROM chat_messages where chatId = "${chatId}" order by created_at desc');
     List<ChatMessageModel> chatList = new List();
-    for (int i = 0; i < list.length; i++) {
+    for (int i = list.length-1; i >=0; i--) {
       var chat = new ChatMessageModel(chatId: list[i]["chatId"], toId:list[i]["toId"], fromId:list[i]["fromId"], fromName: list[i]["fromName"], toName:list[i]["toName"], messageText:list[i]["messageText"],
           chatType: list[i]["chatType"], timeStamp:list[i]["timeStamp"]);
       chatList.add(chat);
@@ -82,9 +83,24 @@ class DatabaseHelper {
     return userList;
   }
 
-  Future<bool> updateUser(ValidUser user) async {
+  Future<bool> updateUser(ValidUser user, String page) async {
     var dbClient = await db;
+    int numOfMessages = 0;
+    if(page =='conversation'){
+      List<Map> list = await dbClient.rawQuery('SELECT * FROM valid_users where userId = "${user.userId}"');
+      if(null != list[0]["numOfMessages"]){
+        numOfMessages = list[0]["numOfMessages"];
+      }
+      user.numOfMessages = numOfMessages+1;
+    }
     int res =   await dbClient.update("valid_users", user.toUpdateMap(),
+        where: "userId = ?", whereArgs: <String>[user.userId]);
+    return res > 0 ? true : false;
+  }
+
+  Future<bool> updateNumMessageUser(ValidUser user) async {
+    var dbClient = await db;
+    int res =   await dbClient.update("valid_users", user.toUpdateNumMessagesMap(),
         where: "userId = ?", whereArgs: <String>[user.userId]);
     return res > 0 ? true : false;
   }

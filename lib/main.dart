@@ -27,6 +27,12 @@ class _State extends State<MyApp> {
   @override
   void initState() {
     LoginResponse loginResponse;
+    readPreference('showMessageOnChatTab').then((value) =>{
+      if(value=='true') {
+        globals.showMessageOnChatTab= true
+      }
+      else globals.showMessageOnChatTab = false,
+    });
     readPreference('loginResponse').then((loginPref) => {
       if(null != loginPref){
         loginResponse = postFromJson(loginPref),

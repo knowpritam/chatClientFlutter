@@ -59,4 +59,10 @@ class ValidUser{
     map["lastMessage"] = lastMessage;
     return map;
   }
+
+  Map<String, dynamic> toUpdateNumMessagesMap() {
+    var map = new Map<String, dynamic>();
+    map["numOfMessages"] = numOfMessages;
+    return map;
+  }
 }

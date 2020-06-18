@@ -36,6 +36,7 @@ class SignupScreen extends StatelessWidget {
     return Scaffold(
         appBar: AppBar(
           title: Text('Sample App'),
+          backgroundColor: Colors.teal,
         ),
         body: Form(
           key: _formKey,
@@ -65,7 +66,8 @@ class SignupScreen extends StatelessWidget {
                     decoration: InputDecoration(
                       contentPadding: EdgeInsets.fromLTRB(20.0, 15.0, 20.0, 15.0),
                       labelText: "Username",
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(32.0)),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(32.0),
+                        borderSide: BorderSide(color: Colors.teal),),
                     ),
                     validator: (value) {
                       if(value.length < 6){
@@ -82,11 +84,14 @@ class SignupScreen extends StatelessWidget {
                     decoration: InputDecoration(
                       contentPadding: EdgeInsets.fromLTRB(20.0, 15.0, 20.0, 15.0),
                       labelText: "Firstname",
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(32.0)),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(32.0),
+                        borderSide: BorderSide(color: Colors.teal),
+                      ),
                     ),
                     validator: (value) {
                       if (value.isEmpty) {
-                        return 'This is required';
+                        return 'Firstname is required';
                       }
                       return null;
                     },
@@ -103,7 +108,7 @@ class SignupScreen extends StatelessWidget {
                     ),
                     validator: (value) {
                       if (value.isEmpty) {
-                        return 'This is required';
+                        return 'Lastname is required';
                       }
                       return null;
                     },

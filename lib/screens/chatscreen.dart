@@ -30,13 +30,16 @@ class _ChatScreenState extends State<ChatScreen> {
       globals.Socket.socketUtils.connectSocket();
     }
     print('adasd');
-    globals.Socket.socketUtils.setOnChatMessageReceivedListener(
-        onChatMessageReceived);
+    globals.Socket.socketUtils.setOnChatMessageReceivedListener( onChatMessageReceived);
     setState(() {
-      getMessagesForChat();
+      getMessagesAndScrollToEnd();
     });
   }
 
+  void getMessagesAndScrollToEnd() async{
+    await getMessagesForChat();
+    _chatListScrollToBottom();
+  }
   void _sendMessage() {
     setState(() {
       ChatMessageModel chatModel = ChatMessageModel(
@@ -48,7 +51,7 @@ class _ChatScreenState extends State<ChatScreen> {
           messageText: _controller.text);
       if (_controller.text.isNotEmpty) {
         addChatToDb(chatModel);
-        updateUserToDb(_controller.text);
+        updateUserToDb("You : "+_controller.text);
         globals.Socket.socketUtils.sendChatMessage(chatModel);
         chatModel.timeStamp = getCurrentTime();
         messagesModel.add(chatModel);
@@ -63,7 +66,8 @@ class _ChatScreenState extends State<ChatScreen> {
       ChatMessageModel chatModel = ChatMessageModel.fromJson(data);
       chatModel.timeStamp = getCurrentTime();
       addChatToDb(chatModel);
-      updateUserToDb(chatModel.messageText);
+      updateUserToDb(chatModel.fromName +": "+chatModel.messageText);
+      //updateUserToDb(chatModel.messageText);
       print(data);
       //messages.add(data["message"].trim());
       messagesModel.add(chatModel);
@@ -79,6 +83,9 @@ class _ChatScreenState extends State<ChatScreen> {
   void clearChatFromDb() async {
     var db = new DatabaseHelper();
     await db.deleteChat(globals.currentConversationId);
+    setState(() async{
+      getMessagesForChat();
+    });
   }
 
   void getMessagesForChat() async {
@@ -89,14 +96,13 @@ class _ChatScreenState extends State<ChatScreen> {
     {
       setState(() {
         messagesModel = res;
-        _chatListScrollToBottom();
       }),
     });
   }
   void updateUserToDb(String message) async {
     var db = new DatabaseHelper();
     ValidUser user = ValidUser(userId:globals.otherUser.userId, lastMessage: message);
-    await db.updateUser(user);
+    await db.updateUser(user, "chat");
   }
   /// Scroll the Chat List when it goes to bottom
   _chatListScrollToBottom() {
@@ -104,7 +110,7 @@ class _ChatScreenState extends State<ChatScreen> {
       if (_chatLVController.hasClients) {
         _chatLVController.animateTo(
           _chatLVController.position.maxScrollExtent,
-          duration: Duration(milliseconds: 100),
+          duration: Duration(milliseconds: 1),
           curve: Curves.decelerate,
         );
       }
@@ -120,6 +126,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   Widget build(BuildContext context) {
+   // _chatScrollListsner();
     return WillPopScope(
       onWillPop: () {
         print('Backbutton pressed (device or appbar button), do whatever you want.');
@@ -129,6 +136,7 @@ class _ChatScreenState extends State<ChatScreen> {
         return Future.value(false);
       },
       child: Scaffold(
+          resizeToAvoidBottomInset: true,
         appBar: AppBar(
           title: Text(globals.otherUser.firstname),
           backgroundColor: Colors.teal,
@@ -154,6 +162,7 @@ class _ChatScreenState extends State<ChatScreen> {
             Expanded(
               child: Container(
                 child: ListView.builder(
+                  shrinkWrap: true,
                   controller: _chatLVController,
                   padding: EdgeInsets.all(10.0),
                   itemCount: messagesModel.length,
@@ -166,6 +175,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 ),
               ),
             ),
+
             Container(
               margin: EdgeInsets.all(10.0),
               decoration: BoxDecoration(
@@ -191,6 +201,7 @@ class _ChatScreenState extends State<ChatScreen> {
                         border: InputBorder.none,
                       ),
                     ),
+
                   ),
                   FloatingActionButton(
                     onPressed: _sendMessage,
@@ -206,7 +217,18 @@ class _ChatScreenState extends State<ChatScreen> {
       ),
     );
   }
-
+//
+//  _chatScrollListsner(){
+//    _chatLVController..addListener(() {
+//      var triggerFetchMoreSize =100;
+//      print('chat position');
+//      print(_chatLVController.position.pixels);
+//      if (_chatLVController.position.pixels < triggerFetchMoreSize) {
+//        globals.limit+=20;
+//        getMessagesForChat();
+//      }
+//    });
+//  }
   _chatBubble(ChatMessageModel chatMessageModel) {
     bool fromMe = chatMessageModel.fromId == globals.globalLoginResponse.userId;
     Alignment alignment = fromMe ? Alignment.topRight : Alignment.topLeft;

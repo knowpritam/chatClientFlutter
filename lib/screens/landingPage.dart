@@ -1,4 +1,3 @@
-import 'dart:collection';
 
 import 'package:flutter/material.dart';
 import 'dart:convert';
@@ -15,7 +14,6 @@ import 'package:flutterapp/models/message.dart';
 import 'package:flutterapp/helpers/DBHelper.dart';
 import 'package:intl/intl.dart';
 
-import 'package:fluttertoast/fluttertoast.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutterapp/helpers/ErrorMessageHelper.dart';
 
@@ -33,31 +31,34 @@ class LandingPageState extends State<LandingPage> {
   List<ValidUser> listToUse =  new List();
 
   var indexToUserIdMap = new Map();
-  var validUserMap = new Map();
   var phoneToUserIdMap = new Map();
   var userIdConversationMap = new Map();
   var currentConversationId;
   final GlobalKey<State> _keyLoader = new GlobalKey<State>();
   String errorMessage;
+  bool showMessageOnChatTab = false;
 
   @override
   void initState() {
     getAllRegisteredUser();
+
     print("got contacts");
     super.initState();
     _connectSocket();
     getUsersForConversation();
   }
   _connectSocket(){
-    globals.Socket.initSocket();
-    if(null == globals.Socket.socketUtils.getSocketIO()){
-      globals.Socket.socketUtils.connectSocket().then((value) => {
-        _connectListsners(),
-      });
-    }
-    else{
-      _connectListsners();
-    }
+    Future.delayed(Duration(seconds: 2), () async {
+      globals.Socket.initSocket();
+      if(null == globals.Socket.socketUtils.getSocketIO()){
+        globals.Socket.socketUtils.connectSocket().then((value) => {
+          _connectListsners(),
+        });
+      }
+      else{
+        _connectListsners();
+      }
+    });
   }
   _connectListsners(){
     globals.Socket.socketUtils.setConnectListener(onConnect);
@@ -71,15 +72,18 @@ class LandingPageState extends State<LandingPage> {
     setState(() {
       ChatMessageModel chatModel = ChatMessageModel.fromJson(data);
       chatModel.timeStamp = getCurrentTime();
-      addChatToDb(chatModel);
-      updateUserToDb(chatModel.messageText);
-      getUsersForConversation();
+      updateAndGetUsers(chatModel);
       //validUserList[valid]
-      showErrorMessage("New  Message from "+"${chatModel.fromName}"+" : "+"${chatModel.messageText}");
+      //showErrorMessage("New  Message from "+"${chatModel.fromName}"+" : "+"${chatModel.messageText}");
       print(data);
     });
   }
 
+  updateAndGetUsers(ChatMessageModel chatModel) async{
+    await addChatToDb(chatModel);
+    await updateUserToDb(chatModel.fromId, chatModel.fromName +": "+chatModel.messageText);
+    await getUsersForConversation();
+  }
   String getCurrentTime() {
     var now = new DateTime.now();
     var formatter = new DateFormat.Hm();
@@ -100,7 +104,6 @@ class LandingPageState extends State<LandingPage> {
         setState(() {
           savePreference('userList', response.body);
           populateValidUsersMap(response.body);
-      //    print(validUserMap[validUserList[0].userId].firstname.toString());
           int a =10;
         }),
       }
@@ -108,12 +111,16 @@ class LandingPageState extends State<LandingPage> {
   }
 
   void populateValidUsersMap(String responseBody){
+    int currUserIndex = -1;
     Iterable list = json.decode(responseBody);
     validUserList = list.map((model) => ValidUser.fromJson(model)).toList();
     for(int i=0; i<validUserList.length;i++){
       ValidUser validUser = validUserList[i];
-      validUserMap.putIfAbsent(validUser.userId, () => validUser);
+      if(validUser.userId == globals.globalLoginResponse.userId){
+        currUserIndex = i;
+      }
     }
+    validUserList.removeAt(currUserIndex);
   }
 
   checkIfConversationExistOrCreateConversation(index, BuildContext context, String fromTab){
@@ -190,18 +197,24 @@ class LandingPageState extends State<LandingPage> {
   }
   void addUserToDb(ValidUser user) async {
     var db = new DatabaseHelper();
+    user.numOfMessages = 0;
     await db.saveUser(user);
     userWithConversationList.insert(0, user);
   }
 
-  void updateUserToDb(String message) async {
+  void updateUserToDb(String userId, String message) async {
     var db = new DatabaseHelper();
-    ValidUser user = ValidUser(userId:globals.otherUser.userId, lastMessage: message);
-    await db.updateUser(user);
+    ValidUser user = ValidUser(userId: userId, lastMessage: message);
+    await db.updateUser(user, "conversation");
+  }
+  void updateNumMessagesToZeroUser(String userId) async {
+    var db = new DatabaseHelper();
+    ValidUser user = ValidUser(userId: userId, numOfMessages: 0);
+    await db.updateNumMessageUser(user);
   }
   void getUsersForConversation() async {
     var db = new DatabaseHelper();
-    db.getUsers().then((res) =>
+    await db.getUsers().then((res) =>
     {
       setState(() {
         userWithConversationList = res;
@@ -210,7 +223,10 @@ class LandingPageState extends State<LandingPage> {
   }
 
   navigateToChatScreen(){
+    savePreference('showMessageOnChatTab', 'false');
+    globals.showMessageOnChatTab = false;
     connectSocket();
+    updateNumMessagesToZeroUser(globals.otherUser.userId);
     Navigator.of(context).push(
         MaterialPageRoute(
           builder: (BuildContext context) => ChatScreen(),
@@ -245,7 +261,7 @@ class LandingPageState extends State<LandingPage> {
     print('onConnectError $data');
     setState(() {
       print(data);
-      errorMessage = "Some error in connecting to server";
+      errorMessage = "Error connecting to server";
       showErrorMessage(errorMessage);
     });
   }
@@ -272,7 +288,7 @@ class LandingPageState extends State<LandingPage> {
     print('onDisconnect $data');
     setState(() {
       print(data);
-      errorMessage = "Disconnected to server";
+      errorMessage = "Disconnected from server";
       showErrorMessage(errorMessage);
     });
   }
@@ -315,8 +331,8 @@ class LandingPageState extends State<LandingPage> {
                 Expanded(
                   child: Container(
                     child: TabBarView(children: [
-                          chatTab(context),
-                          allUserTab(context),
+                      globals.showMessageOnChatTab ? _listEmptyText(): chatTab(context),
+                      allUserTab(context),
                     ]),
                   ),
                 )
@@ -325,6 +341,16 @@ class LandingPageState extends State<LandingPage> {
           ),
       ),
     );
+  }
+
+  Widget _listEmptyText(){
+    return Padding(
+      padding :  EdgeInsets.all(10),
+      child: Text("Please go to users tab and start chatting, the user will start appearing here.",
+        style: TextStyle(fontSize: 16, color: Colors.teal),
+      ),
+    ) ;
+
   }
 
   Widget chatTab(BuildContext context) {
@@ -354,18 +380,20 @@ class LandingPageState extends State<LandingPage> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: <Widget>[
                           Text(validUser.firstname.toString(), style: TextStyle(fontSize: 16),),
-                          Text(validUser.lastMessage.toString() != null ?validUser.lastMessage.toString():" ",
-                            style: TextStyle(fontSize: 10, color: Colors.black45),),
+                          Text(validUser.lastMessage != null ?validUser.lastMessage.toString():" ",
+                            style: TextStyle(fontSize: 12, color: Colors.black54),
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 1,
+                            softWrap: true
+                          ),
                         ],
                       ),
                     ),
-//                    new CircleAvatar(
-//                      backgroundColor: Colors.teal,
-//                      radius: 10.0,
-//                      child: new Text("2",
-//                        style: new TextStyle(color: Colors.white,
-//                            fontSize: 12.0,),),
-//                    )
+                    (validUser.numOfMessages!=null && validUser.numOfMessages>0)?
+                    unreadNotification(context, validUser):
+                    Text(" read",
+                      style: new TextStyle(color: Colors.white,
+                        fontSize: 12.0,),),
                   ],
                 ),
               ),
@@ -375,6 +403,26 @@ class LandingPageState extends State<LandingPage> {
     );
   }
 
+  Widget unreadNotification(BuildContext context, ValidUser validUser){
+    return Container(
+      child: Row(
+          children: <Widget>[
+            CircleAvatar(
+              backgroundColor: Colors.teal,
+              radius: 10.0,
+              child: new Text(validUser.numOfMessages.toString(),
+                style: new TextStyle(color: Colors.white,
+                  fontSize: 12.0,),),
+            ),
+            Text(" unread",
+              style: new TextStyle(color: Colors.black54,
+                fontSize: 12.0,),),
+          ]
+      )
+
+    );
+
+  }
 
   Widget allUserTab(BuildContext context) {
     return ListView.builder(
@@ -402,18 +450,11 @@ class LandingPageState extends State<LandingPage> {
                         // align the text to the left instead of centered
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: <Widget>[
-                          Text(validUser.firstname.toString()+' '+validUser.firstname.toString()+' ('+validUser.username.toString()+')', style: TextStyle(fontSize: 16),),
+                          Text(validUser.firstname.toString()+' '+validUser.lastname.toString()+' ('+validUser.username.toString()+')', style: TextStyle(fontSize: 16),),
                           //Text('Kanchan: Hw r u?', style: TextStyle(fontSize: 10, color: Colors.black45),),
                         ],
                       ),
                     ),
-                    new CircleAvatar(
-                      backgroundColor: Colors.teal,
-                      radius: 10.0,
-                      child: new Text("2",
-                        style: new TextStyle(color: Colors.white,
-                          fontSize: 12.0,),),
-                    )
                   ],
                 ),
               ),

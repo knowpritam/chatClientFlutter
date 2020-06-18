@@ -10,7 +10,7 @@ class SocketUtils {
   static SocketIO socketIO;
   SocketIOManager _manager;
   Future connectSocket() async{
-    _init();
+    await _init();
   }
   _init() async{
     _manager = SocketIOManager();
@@ -96,6 +96,7 @@ class SocketUtils {
 //  }
   setConnectListener(Function onConnect) {
     socketIO.onConnect((data) {
+      socketIO.emit("login",  [globals.globalLoginResponse.toJson()]);
       onConnect(data);
     });
   }

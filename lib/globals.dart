@@ -9,6 +9,9 @@ bool isLoggedIn = false;
 LoginResponse globalLoginResponse = LoginResponse();
 String url = 'https://gentle-bayou-08991.herokuapp.com';
 String currentConversationId;
+bool showMessageOnChatTab;
+//int offset=0;
+//int limit = 20;
 
 ValidUser loggedInUser;
 ValidUser otherUser;
