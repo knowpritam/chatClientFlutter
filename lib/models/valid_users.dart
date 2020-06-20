@@ -66,3 +66,10 @@ class ValidUser{
     return map;
   }
 }
+
+class UsersHistory{
+  String lastMessage;
+  int numOfMessages;
+
+  UsersHistory({this.lastMessage,this.numOfMessages});
+}

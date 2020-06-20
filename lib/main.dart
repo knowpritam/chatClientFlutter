@@ -33,6 +33,7 @@ class _State extends State<MyApp> {
       }
       else globals.showMessageOnChatTab = false,
     });
+    // checking from preference if user is already logged in
     readPreference('loginResponse').then((loginPref) => {
       if(null != loginPref){
         loginResponse = postFromJson(loginPref),
@@ -51,6 +52,7 @@ class _State extends State<MyApp> {
             ))
         }
       }
+      // User not logged in, navigate to login page
       else{
         Navigator.pop(context, true),
         Navigator.push(

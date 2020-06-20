@@ -75,25 +75,12 @@ class SocketUtils {
 
   }
 
-//  void sendChatMessage(String msg) async {
-//    if (socketIO != null) {
-//      //dynamic jsonData = '{"message":{"type":"Text","content": ${(msg != null && msg.isNotEmpty) ? '"${msg}"' : '"Hello SOCKET IO PLUGIN :))"'},"owner":"589f10b9bbcd694aa570988d","avatar":"img/avatar-default.png"},"sender":{"userId":"589f10b9bbcd694aa570988d","first":"Ha","last":"Test 2","location":{"lat":10.792273999999999,"long":106.6430356,"accuracy":38,"regionId":null,"vendor":"gps","verticalAccuracy":null},"name":"Ha Test 2"},"receivers":["587e1147744c6260e2d3a4af"],"conversationId":"589f116612aa254aa4fef79f","name":null,"isAnonymous":null}';
-//      ChatMessageModel chat = ChatMessageModel(chatId:globals.currentConversationId, from:globals.globalLoginResponse.userId,
-//          to:globals.otherUser.userId, fromName:globals.globalLoginResponse.firstname, toName
-//          :globals.otherUser.firstname, message: msg);
-//      socketIO.emit("chat_direct", [chat.toJson()]);
-//    }
-//  }
   void sendChatMessage( ChatMessageModel chat) async {
     if (socketIO != null) {
       socketIO.emit("chat_direct", [chat.toJson()]);
     }
   }
-//  _destroySocket() {
-//    if (socketIO != null) {
-//      SocketIOManager().destroySocket(socketIO);
-//    }
-//  }
+
   setConnectListener(Function onConnect) {
     socketIO.onConnect((data) {
       socketIO.emit("login",  [globals.globalLoginResponse.toJson()]);

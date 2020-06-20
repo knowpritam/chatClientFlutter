@@ -32,21 +32,30 @@ class DatabaseHelper {
     // When creating the db, create the table
     print('dropped');
     await db.execute(
-        "CREATE TABLE IF NOT EXISTS chat_messages(chatId TEXT,toId TEXT, fromId TEXT, fromName TEXT, toName TEXT, messageText TEXT, chatType TEXT, timeStamp TEXT, created_at DATETIME DEFAULT CURRENT_TIMESTAMP);");
+        "CREATE TABLE IF NOT EXISTS chat_messages(incrementId INTEGER PRIMARY KEY AUTOINCREMENT, chatId TEXT,toId TEXT, fromId TEXT, fromName TEXT, toName TEXT, messageText TEXT, chatType TEXT, timeStamp TEXT, created_at DATETIME DEFAULT CURRENT_TIMESTAMP);");
     await db.execute(
         "CREATE TABLE IF NOT EXISTS valid_users(userId TEXT,firstname TEXT, lastname TEXT, username TEXT, phone TEXT, numOfMessages INTEGER, lastMessage TEXT, created_at DATETIME DEFAULT CURRENT_TIMESTAMP,  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP);");
 
   }
 
+  // save list of chat messages retrieved from server
+  Future saveHistoryChat(List<ChatMessageModel> chats) async {
+    for (int i = chats.length-1; i >=0; i--) {
+      saveChat(chats[i]);
+    }
+  }
+
+  // Save chat to db
   Future<int> saveChat(ChatMessageModel chat) async {
     var dbClient = await db;
     int res = await dbClient.insert("chat_messages", chat.toMap());
     return res;
   }
 
+  // get messages from the db in sorted order of insertion
   Future<List<ChatMessageModel>> getMessagesForChat(String chatId) async {
     var dbClient = await db;
-    List<Map> list = await dbClient.rawQuery('SELECT * FROM chat_messages where chatId = "${chatId}" order by created_at desc');
+    List<Map> list = await dbClient.rawQuery('SELECT * FROM chat_messages where chatId = "${chatId}" order by incrementId desc');
     List<ChatMessageModel> chatList = new List();
     for (int i = list.length-1; i >=0; i--) {
       var chat = new ChatMessageModel(chatId: list[i]["chatId"], toId:list[i]["toId"], fromId:list[i]["fromId"], fromName: list[i]["fromName"], toName:list[i]["toName"], messageText:list[i]["messageText"],
@@ -57,22 +66,24 @@ class DatabaseHelper {
     return chatList;
   }
 
+  // delete all chat for a particular conversation
   Future<int> deleteChat(String chatId) async {
     var dbClient = await db;
-    int res =
-    await dbClient.rawDelete('DELETE FROM chat_messages where chatId = "${chatId}"');
+    int res =  await dbClient.rawDelete('DELETE FROM chat_messages where chatId = "${chatId}"');
     return res;
   }
 
+  // save a new user so that it shows up on chat tab
   Future<int> saveUser(ValidUser user) async {
     var dbClient = await db;
     int res = await dbClient.insert("valid_users", user.toMap());
     return res;
   }
 
+  // get users
   Future<List<ValidUser>> getUsers() async {
     var dbClient = await db;
-    List<Map> list = await dbClient.rawQuery('SELECT * FROM valid_users order by updated_at asc');
+    List<Map> list = await dbClient.rawQuery('SELECT * FROM valid_users order by created_at asc');
     List<ValidUser> userList = new List();
     for (int i = 0; i < list.length; i++) {
       var user = new ValidUser(userId: list[i]["userId"], firstname:list[i]["firstname"], lastname:list[i]["lastname"], username:list[i]["username"], phone:list[i]["phone"],
@@ -83,6 +94,7 @@ class DatabaseHelper {
     return userList;
   }
 
+  // update user in case of a new message to reflect the last message and number of new messages
   Future<bool> updateUser(ValidUser user, String page) async {
     var dbClient = await db;
     int numOfMessages = 0;
@@ -98,10 +110,51 @@ class DatabaseHelper {
     return res > 0 ? true : false;
   }
 
+  // update users table with older messages
+  void updateUsersAndSetMessageNumberCount(Map historyUsersMap)  async{
+//    await historyUsersMap.forEach((key, value) {
+//      UsersHistory hisUser = value;
+//      ValidUser user = ValidUser(userId: key, lastMessage: hisUser.lastMessage, numOfMessages:hisUser.numOfMessages );
+//      updateUserAndSetMessageNumberCount(user);
+//    });
+    for(MapEntry<String, UsersHistory> entry in historyUsersMap.entries){
+      UsersHistory hisUser = entry.value;
+      String key = entry.key;
+      ValidUser user = ValidUser(userId: key, lastMessage: hisUser.lastMessage, numOfMessages:hisUser.numOfMessages );
+      await updateUserAndSetMessageNumberCount(user);
+    }
+  }
+
+  // Update user
+  Future<bool> updateUserAndSetMessageNumberCount(ValidUser user) async {
+    var dbClient = await db;
+    int numOfMessages = 0;
+    List<Map> list = await dbClient.rawQuery('SELECT * FROM valid_users where userId = "${user.userId}"');
+    if(null != list[0]["numOfMessages"]){
+      numOfMessages = list[0]["numOfMessages"];
+    }
+    user.numOfMessages+=numOfMessages;
+    int res =   await dbClient.update("valid_users", user.toUpdateMap(),
+        where: "userId = ?", whereArgs: <String>[user.userId]);
+
+    List<Map> list1 = await dbClient.rawQuery('SELECT * FROM valid_users where userId = "${user.userId}"');
+    return res > 0 ? true : false;
+  }
+
   Future<bool> updateNumMessageUser(ValidUser user) async {
     var dbClient = await db;
     int res =   await dbClient.update("valid_users", user.toUpdateNumMessagesMap(),
         where: "userId = ?", whereArgs: <String>[user.userId]);
     return res > 0 ? true : false;
   }
+
+//  Future<int> getNumOfMessagesForUser(String userId) async{
+//    var dbClient = await db;
+//    int numOfMessages = 0;
+//      List<Map> list = await dbClient.rawQuery('SELECT * FROM valid_users where userId = "${userId}"');
+//      if(null != list[0]["numOfMessages"]){
+//        numOfMessages = list[0]["numOfMessages"];
+//      }
+//      return numOfMessages;
+//  }
 }

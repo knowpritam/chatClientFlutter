@@ -2,40 +2,33 @@ import 'package:flutterapp/models/signup_post.dart';
 import 'package:http/http.dart' as http;
 import 'dart:async';
 import 'package:flutterapp/models/login.dart';
-import 'package:flutterapp/models/phonenumbers_post.dart';
+import 'package:flutterapp/globals.dart' as globals;
 import 'package:flutterapp/models/conversation_post.dart';
 
 import 'dart:io';
 
-Future<http.Response> createPost(String url, Login post) async{
-  final response = await http.post('$url',
-      headers: {
-        HttpHeaders.contentTypeHeader: 'application/json',
-        HttpHeaders.authorizationHeader : ''
-      },
-      body: postToJson(post)
+// get chats(when user was offline) for the logged in user
+Future<http.Response> getHistoryChat(String url ) async{
+  final response = await http.get('$url',
+    headers: {
+      HttpHeaders.authorizationHeader : 'bearer ' +globals.globalLoginResponse.token,
+    },
   );
   return response;
 }
 
-Future<http.Response> createPostUser(String url, PhoneNumbers post) async{
-  final response = await http.post('$url',
-      headers: {
-        HttpHeaders.contentTypeHeader: 'application/json',
-        HttpHeaders.authorizationHeader : ''
-      },
-      body: postToJsonUser(post)
+// delete chats for the logged in user from server
+Future<http.Response> deleteHistoryChat(String url ) async{
+  final response = await http.delete('$url',
+    headers: {
+      HttpHeaders.authorizationHeader : 'bearer ' +globals.globalLoginResponse.token,
+    },
   );
   return response;
 }
 
-Future<http.Response> getUsers(String url) async{
-  final response = await http.get('$url');
-  return response;
-}
-
-Future<http.Response> createPostConversation(String url, Conversation post, String authToken) async{
-  String postPayload = postToJsonConversation(post);
+// get(if exists) or create conversation between two users
+Future<http.Response> createConversation(String url, Conversation post, String authToken) async{
   final response = await http.post('$url',
       headers: {
         HttpHeaders.contentTypeHeader: 'application/json',
@@ -46,6 +39,20 @@ Future<http.Response> createPostConversation(String url, Conversation post, Stri
   return response;
 }
 
+
+// Login REST call
+Future<http.Response> loginUser(String url, Login post) async{
+  final response = await http.post('$url',
+      headers: {
+        HttpHeaders.contentTypeHeader: 'application/json',
+        HttpHeaders.authorizationHeader : ''
+      },
+      body: postToJson(post)
+  );
+  return response;
+}
+
+// create a new user (Signup)
 Future<http.Response> createUser(String url, SignupModel post) async {
   String postPayload = postToJsonSignup(post);
   final response = await http.post('$url',
@@ -54,5 +61,11 @@ Future<http.Response> createUser(String url, SignupModel post) async {
       },
       body: postPayload
   );
+  return response;
+}
+
+// get all user
+Future<http.Response> getUsers(String url) async{
+  final response = await http.get('$url');
   return response;
 }

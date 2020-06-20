@@ -19,8 +19,7 @@ class _ChatScreenState extends State<ChatScreen> {
   ScrollController _chatLVController = ScrollController(
       initialScrollOffset: 0.0);
   List<ChatMessageModel> messagesModel = new List();
-  var messageList = new Map();
-  List<String> messages = new List();
+  String errorMessage;
 
   @override
   void initState() {
@@ -30,12 +29,24 @@ class _ChatScreenState extends State<ChatScreen> {
       globals.Socket.socketUtils.connectSocket();
     }
     print('adasd');
-    globals.Socket.socketUtils.setOnChatMessageReceivedListener( onChatMessageReceived);
+    // Registering socket to listen to received message on chat screen
+    _connectListeners();
     setState(() {
       getMessagesAndScrollToEnd();
     });
   }
 
+  // Initializing all connection listeners which will listen to connection state
+  _connectListeners(){
+    globals.Socket.socketUtils.setConnectListener(onConnect);
+    globals.Socket.socketUtils.setOnConnectionErrorListener(onConnectError);
+    globals.Socket.socketUtils.setOnConnectionErrorTimeOutListener(onConnectTimeout);
+    globals.Socket.socketUtils.setOnDisconnectListener(onDisconnect);
+    globals.Socket.socketUtils.setOnErrorListener(onError);
+    globals.Socket.socketUtils.setOnChatMessageReceivedListener(onChatMessageReceived);
+  }
+
+  //
   void getMessagesAndScrollToEnd() async{
     await getMessagesForChat();
     _chatListScrollToBottom();
@@ -48,12 +59,13 @@ class _ChatScreenState extends State<ChatScreen> {
           toId: globals.otherUser.userId,
           fromName: globals.globalLoginResponse.firstname,
           toName: globals.otherUser.firstname,
-          messageText: _controller.text);
+          messageText: _controller.text,
+          timeStamp: getCurrentTime()
+      );
       if (_controller.text.isNotEmpty) {
         addChatToDb(chatModel);
         updateUserToDb("You : "+_controller.text);
         globals.Socket.socketUtils.sendChatMessage(chatModel);
-        chatModel.timeStamp = getCurrentTime();
         messagesModel.add(chatModel);
         _controller.text = "";
         _chatListScrollToBottom();
@@ -61,15 +73,20 @@ class _ChatScreenState extends State<ChatScreen> {
     });
   }
 
+  String getCurrentTime() {
+    var now = new DateTime.now();
+    var formatter = new DateFormat.Hm();
+    String formattedTime = formatter.format(now);
+    return formattedTime;
+  }
+
+  // Listener for any new message received from this user
   void onChatMessageReceived(data) {
     setState(() {
       ChatMessageModel chatModel = ChatMessageModel.fromJson(data);
-      chatModel.timeStamp = getCurrentTime();
       addChatToDb(chatModel);
       updateUserToDb(chatModel.fromName +": "+chatModel.messageText);
-      //updateUserToDb(chatModel.messageText);
       print(data);
-      //messages.add(data["message"].trim());
       messagesModel.add(chatModel);
       _chatListScrollToBottom();
     });
@@ -80,6 +97,7 @@ class _ChatScreenState extends State<ChatScreen> {
     await db.saveChat(chatModel);
   }
 
+  // Removing chats from local DB -- Chats are not stored on server so this is irreversible
   void clearChatFromDb() async {
     var db = new DatabaseHelper();
     await db.deleteChat(globals.currentConversationId);
@@ -88,6 +106,7 @@ class _ChatScreenState extends State<ChatScreen> {
     });
   }
 
+  // Getting message for this chat
   void getMessagesForChat() async {
     print("chatId");
     print(globals.currentConversationId);
@@ -99,12 +118,15 @@ class _ChatScreenState extends State<ChatScreen> {
       }),
     });
   }
+
+  // Update last message to user which will be shown on the chat tab
   void updateUserToDb(String message) async {
     var db = new DatabaseHelper();
     ValidUser user = ValidUser(userId:globals.otherUser.userId, lastMessage: message);
     await db.updateUser(user, "chat");
   }
-  /// Scroll the Chat List when it goes to bottom
+
+  // Scroll the Chat List when it goes to bottom
   _chatListScrollToBottom() {
     Timer(Duration(milliseconds: 100), () {
       if (_chatLVController.hasClients) {
@@ -117,16 +139,56 @@ class _ChatScreenState extends State<ChatScreen> {
     });
   }
 
-  String getCurrentTime() {
-    var now = new DateTime.now();
-    var formatter = new DateFormat.Hm();
-    String formattedTime = formatter.format(now);
-    return formattedTime;
+
+// ******************************* LISTENERS FOR SOCKET START *******************************
+  onConnect(data) {
+    print('Connected $data');
+    setState(() {
+      print(data);
+      errorMessage = "Connected to server";
+      showErrorMessage(errorMessage);
+    });
   }
+
+  onConnectError(data) {
+    print('onConnectError $data');
+    setState(() {
+      print(data);
+      errorMessage = "Error connecting to server";
+      showErrorMessage(errorMessage);
+    });
+  }
+
+  onConnectTimeout(data) {
+    print('onConnectTimeout $data');
+    setState(() {
+      print(data);
+      errorMessage = "Timeout while connecting to server";
+      showErrorMessage(errorMessage);
+    });
+  }
+
+  onError(data) {
+    print('onError $data');
+    setState(() {
+      print(data);
+      errorMessage = "Error connecting to server";
+      showErrorMessage(errorMessage);
+    });
+  }
+
+  onDisconnect(data) {
+    print('onDisconnect $data');
+    setState(() {
+      print(data);
+      errorMessage = "Disconnected from server";
+      showErrorMessage(errorMessage);
+    });
+  }
+// ******************************* LISTENERS FOR SOCKET END *******************************
 
   @override
   Widget build(BuildContext context) {
-   // _chatScrollListsner();
     return WillPopScope(
       onWillPop: () {
         print('Backbutton pressed (device or appbar button), do whatever you want.');
@@ -217,18 +279,7 @@ class _ChatScreenState extends State<ChatScreen> {
       ),
     );
   }
-//
-//  _chatScrollListsner(){
-//    _chatLVController..addListener(() {
-//      var triggerFetchMoreSize =100;
-//      print('chat position');
-//      print(_chatLVController.position.pixels);
-//      if (_chatLVController.position.pixels < triggerFetchMoreSize) {
-//        globals.limit+=20;
-//        getMessagesForChat();
-//      }
-//    });
-//  }
+
   _chatBubble(ChatMessageModel chatMessageModel) {
     bool fromMe = chatMessageModel.fromId == globals.globalLoginResponse.userId;
     Alignment alignment = fromMe ? Alignment.topRight : Alignment.topLeft;

@@ -35,7 +35,7 @@ class SignupScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
         appBar: AppBar(
-          title: Text('Sample App'),
+          title: Text(''),
           backgroundColor: Colors.teal,
         ),
         body: Form(

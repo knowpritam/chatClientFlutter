@@ -28,7 +28,6 @@ class LoginPage extends StatefulWidget {
 class LoginPageState extends State<LoginPage> {
   TextEditingController nameController = TextEditingController();
   TextEditingController passwordController = TextEditingController();
-  final GlobalKey<ScaffoldState> _scaffoldKey = new GlobalKey<ScaffoldState>();
   String errorMessage = "";
   SocketUtils socketUtils = SocketUtils();
 
@@ -40,8 +39,9 @@ class LoginPageState extends State<LoginPage> {
         password: passwordController.text
     );
     String url = globals.url+'/users/login';
-    createPost(url, login).then((response) => {
+    loginUser(url, login).then((response) => {
       if(response.statusCode == 200){
+        // save response to preference which will be used for further validations
         savePreference('loginResponse', response.body),
         savePreference('showMessageOnChatTab', 'true'),
         globals.showMessageOnChatTab= true,
@@ -51,33 +51,18 @@ class LoginPageState extends State<LoginPage> {
              username: loginResponse.firstname, phone: "2"),
         globals.loggedInUser = loggedInUser,
         print(loginResponse),
+        // initializing socket
         initSocket(),
         Navigator.push(
             context,
             MaterialPageRoute(
               builder: (BuildContext context) => LandingPage(),
             ))
-        //getContactAccess(),
-
-        // Not checking contacts for now
-//        checkContactAccess().then((status) => {
-//          if(status){
-//            Navigator.push(
-//                context,
-//                MaterialPageRoute(
-//                  builder: (BuildContext context) => LandingPage(),
-//                ))
-//          }
-//          else{
-//            errorMessage = "Please provide permission to access contacts to proceed further",
-//            showErrorMessage(errorMessage),
-//          }
-//        }),
-
       }
       else{
+        // Show error for failed login attempt
         print(response.statusCode),
-        errorMessage = "Login Failed, please recheck the details",
+        errorMessage = "Login Failed, please check and reenter the details",
         showErrorMessage(errorMessage),
       }
     });
@@ -93,7 +78,7 @@ class LoginPageState extends State<LoginPage> {
   Widget build(BuildContext context) {
     return Scaffold(
         appBar: AppBar(
-          title: Text('Sample App'),
+          title: Text(''),
           backgroundColor: Colors.teal,
         ),
         body: Padding(
