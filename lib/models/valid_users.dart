@@ -34,6 +34,7 @@ class ValidUser{
     "firstname": firstname,
     "lastname": lastname,
     "username": username,
+    "phone": phone,
     "numOfMessages": numOfMessages,
     "lastMessage": lastMessage,
   };

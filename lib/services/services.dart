@@ -39,6 +39,15 @@ Future<http.Response> createConversation(String url, Conversation post, String a
   return response;
 }
 
+// get all conversations for logged in user
+Future<http.Response> getConversationsForUser(String url ) async{
+  final response = await http.get('$url',
+    headers: {
+      HttpHeaders.authorizationHeader : 'bearer ' +globals.globalLoginResponse.token,
+    },
+  );
+  return response;
+}
 
 // Login REST call
 Future<http.Response> loginUser(String url, Login post) async{

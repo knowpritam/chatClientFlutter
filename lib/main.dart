@@ -45,6 +45,7 @@ class _State extends State<MyApp> {
             globals.Socket.socketUtils.connectSocket(),
           },
           Navigator.pop(context, true),
+          globals.currentPage="landing",
           Navigator.push(
             context,
             MaterialPageRoute(

@@ -11,9 +11,10 @@ class LoginResponse {
   final String token;
   final String firstname;
   final String lastname;
+  final String phone;
   final bool isSuccess;
 
-  LoginResponse({this.userId, this.token, this.firstname, this.lastname, this.isSuccess});
+  LoginResponse({this.userId, this.token, this.firstname, this.lastname,this.phone, this.isSuccess});
 
   factory LoginResponse.fromJson(Map<String, dynamic> json) {
     return LoginResponse(
@@ -21,7 +22,7 @@ class LoginResponse {
       token: json['token'],
       firstname: json['firstname'],
       lastname: json['lastname'],
-
+      phone: json['phone'],
       isSuccess: json['success'],
     );
   }

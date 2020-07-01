@@ -7,6 +7,9 @@ import 'package:flutterapp/widgets/ChatBubble.dart';
 import 'package:intl/intl.dart';
 import 'package:flutterapp/helpers/ErrorMessageHelper.dart';
 import 'package:flutterapp/models/valid_users.dart';
+import 'package:flutterapp/helpers/HistoryHelper.dart';
+import 'package:flutterapp/services/services.dart';
+import 'package:keyboard_visibility/keyboard_visibility.dart';
 
 class ChatScreen extends StatefulWidget {
   @override
@@ -20,9 +23,22 @@ class _ChatScreenState extends State<ChatScreen> {
       initialScrollOffset: 0.0);
   List<ChatMessageModel> messagesModel = new List();
   String errorMessage;
+  // Add variable to top of class
+  Alignment childAlignment = Alignment.center;
 
   @override
   void initState() {
+    KeyboardVisibilityNotification().addNewListener(
+      onChange: (bool visible) {
+        print('keyboard $visible');
+        _chatListScrollToBottom();
+        // Add state updating code
+        setState(() {
+          childAlignment = visible ? Alignment.topCenter : Alignment.center;
+
+        });
+      },
+    );
     super.initState();
     globals.Socket.initSocket();
     if(null == globals.Socket.socketUtils.getSocketIO()){
@@ -52,6 +68,11 @@ class _ChatScreenState extends State<ChatScreen> {
     _chatListScrollToBottom();
   }
   void _sendMessage() {
+    if(globals.online == false){
+      errorMessage = "You are disconnected from cloud, please wait or check your network connection";
+      showErrorMessage(errorMessage);
+      return;
+    }
     setState(() {
       ChatMessageModel chatModel = ChatMessageModel(
           chatId: globals.currentConversationId,
@@ -109,13 +130,15 @@ class _ChatScreenState extends State<ChatScreen> {
   // Getting message for this chat
   void getMessagesForChat() async {
     print("chatId");
-    print(globals.currentConversationId);
-    var db = new DatabaseHelper();
+        print(globals.currentConversationId);
+        var db = new DatabaseHelper();
     db.getMessagesForChat(globals.currentConversationId).then((res) =>
     {
-      setState(() {
-        messagesModel = res;
-      }),
+      if(this.mounted){
+        setState(() {
+          messagesModel = res;
+        }),
+      }
     });
   }
 
@@ -139,13 +162,33 @@ class _ChatScreenState extends State<ChatScreen> {
     });
   }
 
+// Gets the chats(when user was offline) for this user from server and notifies the user
+  getHistory(){
+    String url = globals.url+'/messages/messagesForUser/'+globals.globalLoginResponse.userId;
+    int ad = 0;
+    getHistoryChat(url).then((response) => {
+      print(response.body),
+      // If response is not blank i.e. at least one chat message is there on server for this user
+      if(response.statusCode == 200 && response.body != '[]'){
+        deleteHistoryChat(url), // deleting the chat from server once received by client
+        getLocalHistory(response.body),
+      }
+    });
+  }
 
+  getLocalHistory(String response) async{
+    await getHistoryAndUpdateUsers(response);
+    getMessagesAndScrollToEnd();
+  }
 // ******************************* LISTENERS FOR SOCKET START *******************************
   onConnect(data) {
     print('Connected $data');
+    if(globals.currentPage=="chat")
+      getHistory();
     setState(() {
+      globals.online = true;
       print(data);
-      errorMessage = "Connected to server";
+      errorMessage = "Connected to cloud";
       showErrorMessage(errorMessage);
     });
   }
@@ -155,7 +198,7 @@ class _ChatScreenState extends State<ChatScreen> {
     setState(() {
       print(data);
       errorMessage = "Error connecting to server";
-      showErrorMessage(errorMessage);
+      //showErrorMessage(errorMessage);
     });
   }
 
@@ -164,7 +207,7 @@ class _ChatScreenState extends State<ChatScreen> {
     setState(() {
       print(data);
       errorMessage = "Timeout while connecting to server";
-      showErrorMessage(errorMessage);
+      //showErrorMessage(errorMessage);
     });
   }
 
@@ -173,15 +216,16 @@ class _ChatScreenState extends State<ChatScreen> {
     setState(() {
       print(data);
       errorMessage = "Error connecting to server";
-      showErrorMessage(errorMessage);
+      //showErrorMessage(errorMessage);
     });
   }
 
   onDisconnect(data) {
     print('onDisconnect $data');
     setState(() {
+      globals.online = false;
       print(data);
-      errorMessage = "Disconnected from server";
+      errorMessage = "Disconnected from cloud";
       showErrorMessage(errorMessage);
     });
   }
@@ -191,14 +235,15 @@ class _ChatScreenState extends State<ChatScreen> {
   Widget build(BuildContext context) {
     return WillPopScope(
       onWillPop: () {
+        globals.currentPage="landing";
         print('Backbutton pressed (device or appbar button), do whatever you want.');
         globals.Socket.socketUtils.setOffChatMessageReceivedListener();
-        Navigator.pop(context, 'true');
+        Navigator.pop(context);
         //we need to return a future
         return Future.value(false);
       },
       child: Scaffold(
-          resizeToAvoidBottomInset: true,
+          resizeToAvoidBottomPadding: true,
         appBar: AppBar(
           title: Text(globals.otherUser.firstname),
           backgroundColor: Colors.teal,
@@ -219,63 +264,75 @@ class _ChatScreenState extends State<ChatScreen> {
             ),
           ],
         ),
-        body: Column(
-          children: <Widget>[
-            Expanded(
-              child: Container(
-                child: ListView.builder(
-                  shrinkWrap: true,
-                  controller: _chatLVController,
-                  padding: EdgeInsets.all(10.0),
-                  itemCount: messagesModel.length,
-                  itemBuilder: (BuildContext context, int index) {
-                    ChatMessageModel chatMessage = messagesModel[index];
-                    return _chatBubble(
-                      chatMessage,
-                    );
-                  },
+        body: AnimatedContainer(
+          curve: Curves.easeOut,
+          duration: Duration(
+            milliseconds: 400,
+          ),
+          width: double.infinity,
+          height: double.infinity,
+          //padding: const EdgeInsets.all(20),
+          alignment: Alignment.topCenter,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              Flexible(
+                child: Container(
+                  child: ListView.builder(
+                    shrinkWrap: true,
+                    controller: _chatLVController,
+                    padding: EdgeInsets.all(10.0),
+                    itemCount: messagesModel.length,
+                    itemBuilder: (BuildContext context, int index) {
+                      ChatMessageModel chatMessage = messagesModel[index];
+                      return _chatBubble(
+                        chatMessage,
+                      );
+                    },
+                  ),
                 ),
               ),
-            ),
 
-            Container(
-              margin: EdgeInsets.all(10.0),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(25.0),
-                boxShadow: [
-                  BoxShadow(
-                      offset: Offset(0, 3),
-                      blurRadius: 10,
-                      color: Colors.grey)
-                ],
-              ),
-              child: Row(
-                children: <Widget>[
-                  Expanded(
-                    child: TextField(
-                      keyboardType: TextInputType.multiline,
-                      maxLines: null,
-                      controller: _controller,
-                      decoration: InputDecoration(
-                        contentPadding: EdgeInsets.all(15.0),
-                        hintText: 'Enter text',
-                        border: InputBorder.none,
+              Container(
+                margin: EdgeInsets.all(10.0),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(25.0),
+                  boxShadow: [
+                    BoxShadow(
+                        offset: Offset(0, 3),
+                        blurRadius: 10,
+                        color: Colors.grey)
+                  ],
+                ),
+                child: Row(
+                  children: <Widget>[
+                    Expanded(
+                      child: TextField(
+                        keyboardType: TextInputType.multiline,
+                        maxLines: null,
+                        controller: _controller,
+                        decoration: InputDecoration(
+                          contentPadding: EdgeInsets.all(15.0),
+                          hintText: 'Enter text',
+                          border: InputBorder.none,
+                        ),
                       ),
-                    ),
 
-                  ),
-                  FloatingActionButton(
-                    onPressed: _sendMessage,
-                    tooltip: 'Send message',
-                    child: Icon(Icons.send),
-                    backgroundColor: Colors.teal,
-                  ),
-                ],
+                    ),
+                    FloatingActionButton(
+                      onPressed: _sendMessage,
+                      tooltip: 'Send message',
+                      child: Icon(Icons.send),
+                      backgroundColor: Colors.teal,
+                    ),
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
+
       ),
     );
   }

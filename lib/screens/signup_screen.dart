@@ -8,6 +8,7 @@ import 'package:flutterapp/widgets/Dialog.dart';
 class SignupScreen extends StatelessWidget {
   TextEditingController nameController = TextEditingController();
   TextEditingController firstNameController = TextEditingController();
+  TextEditingController phoneController = TextEditingController();
   TextEditingController lastNameController = TextEditingController();
   TextEditingController passwordController = TextEditingController();
   TextEditingController reEnterPasswordController = TextEditingController();
@@ -17,10 +18,11 @@ class SignupScreen extends StatelessWidget {
   signupUser(BuildContext context){
     String url = globals.url+'/users/signup';
     SignupModel signupModel = SignupModel(
-        username: nameController.text,
-        password: passwordController.text,
-        firstname: firstNameController.text,
-        lastname: lastNameController.text
+        username: nameController.text.trim(),
+        password: passwordController.text.trim(),
+        firstname: firstNameController.text.trim(),
+        lastname: lastNameController.text.trim(),
+        phone: phoneController.text.trim(),
     );
     Dialogs.showLoadingDialog(context, _keyLoader,  "Please wait ... ");
     createUser(url, signupModel).then((response) =>
@@ -109,6 +111,26 @@ class SignupScreen extends StatelessWidget {
                     validator: (value) {
                       if (value.isEmpty) {
                         return 'Lastname is required';
+                      }
+                      return null;
+                    },
+                  ),
+                ),
+                Container(
+                  padding: EdgeInsets.all(10),
+                  child: TextFormField(
+                    controller: phoneController,
+                    keyboardType: TextInputType.number,
+
+                    decoration: InputDecoration(
+                      contentPadding: EdgeInsets.fromLTRB(20.0, 15.0, 20.0, 15.0),
+                      labelText: "Phone",
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(32.0)),
+                    ),
+
+                    validator: (value) {
+                      if (value.length != 10) {
+                        return 'Phone number should be 10 digits';
                       }
                       return null;
                     },

@@ -16,7 +16,6 @@ class Dialogs {
                     Center(
                       child: Column(children: [
                         CircularProgressIndicator(),
-                        SizedBox(height: 10,),
                         Text(message ,style: TextStyle(color: Colors.white),)
                       ]),
                     )

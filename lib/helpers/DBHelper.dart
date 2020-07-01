@@ -112,11 +112,6 @@ class DatabaseHelper {
 
   // update users table with older messages
   void updateUsersAndSetMessageNumberCount(Map historyUsersMap)  async{
-//    await historyUsersMap.forEach((key, value) {
-//      UsersHistory hisUser = value;
-//      ValidUser user = ValidUser(userId: key, lastMessage: hisUser.lastMessage, numOfMessages:hisUser.numOfMessages );
-//      updateUserAndSetMessageNumberCount(user);
-//    });
     for(MapEntry<String, UsersHistory> entry in historyUsersMap.entries){
       UsersHistory hisUser = entry.value;
       String key = entry.key;
@@ -148,13 +143,4 @@ class DatabaseHelper {
     return res > 0 ? true : false;
   }
 
-//  Future<int> getNumOfMessagesForUser(String userId) async{
-//    var dbClient = await db;
-//    int numOfMessages = 0;
-//      List<Map> list = await dbClient.rawQuery('SELECT * FROM valid_users where userId = "${userId}"');
-//      if(null != list[0]["numOfMessages"]){
-//        numOfMessages = list[0]["numOfMessages"];
-//      }
-//      return numOfMessages;
-//  }
 }

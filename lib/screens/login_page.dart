@@ -7,12 +7,15 @@ import 'package:flutterapp/models/login_response.dart';
 import 'package:flutterapp/screens/signup_screen.dart';
 import 'package:flutterapp/globals.dart' as globals;
 import 'package:flutterapp/services/services.dart';
+import 'package:flutterapp/permission/contact.dart';
 import 'package:flutterapp/models/login.dart';
 import 'package:flutterapp/models/valid_users.dart';
 import 'package:flutterapp/helpers/SocketUtils.dart';
 import 'package:flutterapp/helpers/ErrorMessageHelper.dart';
 import 'package:flutterapp/persistance/shared_preference.dart';
 import 'file:///C:/Users/knowp/AndroidStudioProjects/flutter_app/lib/screens/landingPage.dart';
+import 'package:flutterapp/widgets/Dialog.dart';
+import 'package:contacts_service/contacts_service.dart';
 
 void main() {
   runApp(MaterialApp(
@@ -30,15 +33,17 @@ class LoginPageState extends State<LoginPage> {
   TextEditingController passwordController = TextEditingController();
   String errorMessage = "";
   SocketUtils socketUtils = SocketUtils();
+  final GlobalKey<State> _keyLoader = new GlobalKey<State>();
 
   loginAPI(){
     LoginResponse loginResponse;
     ValidUser loggedInUser;
     Login login = Login(
-        username: nameController.text,
-        password: passwordController.text
+        username: nameController.text.trim(),
+        password: passwordController.text.trim()
     );
     String url = globals.url+'/users/login';
+    Dialogs.showLoadingDialog(context, _keyLoader,  "Logging in ...");
     loginUser(url, login).then((response) => {
       if(response.statusCode == 200){
         // save response to preference which will be used for further validations
@@ -53,14 +58,26 @@ class LoginPageState extends State<LoginPage> {
         print(loginResponse),
         // initializing socket
         initSocket(),
-        Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (BuildContext context) => LandingPage(),
-            ))
+        Navigator.of(_keyLoader.currentContext,rootNavigator: true).pop(),//close the dialog
+        checkContactAccess().then((status) => {
+          if(status){
+            Navigator.pop(context, true),
+            globals.currentPage="landing",
+            Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (BuildContext context) => LandingPage(),
+                ))
+          }
+          else{
+            errorMessage = "Please provide permission to access contacts to proceed further",
+            showErrorMessage(errorMessage),
+          }
+        }),
       }
       else{
         // Show error for failed login attempt
+        Navigator.of(_keyLoader.currentContext,rootNavigator: true).pop(),//close the dialog
         print(response.statusCode),
         errorMessage = "Login Failed, please check and reenter the details",
         showErrorMessage(errorMessage),
@@ -68,6 +85,11 @@ class LoginPageState extends State<LoginPage> {
     });
   }
 
+  getContact() async{
+    print('started loading contacts');
+    globals.contacts = await ContactsService.getContacts();
+    print('done loading contacts');
+  }
   initSocket(){
     globals.Socket.initSocket();
     globals.Socket.socketUtils.connectSocket();
