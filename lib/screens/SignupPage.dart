@@ -1,7 +1,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutterapp/globals.dart' as globals;
-import 'package:flutterapp/services/services.dart';
+import 'package:flutterapp/services/RestServices.dart';
 import 'package:flutterapp/models/signup_post.dart';
 import 'package:flutterapp/widgets/Dialog.dart';
 

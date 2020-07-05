@@ -4,9 +4,9 @@ import 'dart:convert';
 import 'package:flutterapp/models/conversation_post.dart';
 import 'package:flutterapp/globals.dart' as globals;
 import 'package:flutterapp/models/valid_users.dart';
-import 'package:flutterapp/services/services.dart';
-import 'package:flutterapp/screens/chatscreen.dart';
-import 'package:flutterapp/persistance/shared_preference.dart';
+import 'package:flutterapp/services/RestServices.dart';
+import 'package:flutterapp/screens/ChatPage.dart';
+import 'package:flutterapp/persistance/SharedPreference.dart';
 import 'package:flutterapp/widgets/Dialog.dart';
 import 'package:flutterapp/models/message.dart';
 import 'package:flutterapp/helpers/DBHelper.dart';
@@ -32,8 +32,7 @@ class LandingPageState extends State<LandingPage> {
   Map<String, UsersHistory> historyUsersMap = new Map();  // Stores lastMessage and numOfMessages against userId(from)
   Map<String, ValidUser> validContactsForThisUserMap = new Map();
 
-  List<ChatMessageModel> chatList = new List();           //
-                  // Stores conversationId against userId
+  List<ChatMessageModel> chatList = new List();
   var currentConversationId;                              // Stores currentConversationId
   final GlobalKey<State> _keyLoader = new GlobalKey<State>();
   final GlobalKey<State> _keyLoader1 = new GlobalKey<State>();
@@ -86,35 +85,7 @@ class LandingPageState extends State<LandingPage> {
     });
   }
 
-//  // Gets the chats(when user was offline) for this user from server and notifies the user
-//  getHistory(){
-//    String url = globals.url+'/messages/messagesForUser/'+globals.globalLoginResponse.userId;
-//    int ad = 0;
-//    getHistoryChat(url).then((response) => {
-//      print(response.body),
-//      // If response is not blank i.e. at least one chat message is there on server for this user
-//      if(response.statusCode == 200 && response.body != '[]'){
-//        deleteHistoryChat(url), // deleting the chat from server once received by client
-//        setState(() {
-//          Iterable list = json.decode(response.body);
-//          chatList = list.map((model) => ChatMessageModel.fromJson(model)).toList();
-//          for(int i = chatList.length-1; i>=0;i--){
-//            if(historyUsersMap.containsKey(chatList[i].fromId)){
-//              UsersHistory user = historyUsersMap[chatList[i].fromId];
-//              user.numOfMessages+=1; // updating new numberOfMessages
-//              user.lastMessage = chatList[i].fromName+' : '+chatList[i].messageText; // updating new Last message
-//              historyUsersMap.update(chatList[i].fromId, (value) => user);
-//            }
-//            else{
-//              UsersHistory user = UsersHistory(lastMessage: chatList[i].messageText, numOfMessages: 1);
-//              historyUsersMap.putIfAbsent(chatList[i].fromId, () => user);
-//            }
-//          }
-//          updateHistoryAndGetUsers(chatList, historyUsersMap);
-//        }),
-//      }
-//    });
-//  }
+
   // Gets the chats(when user was offline) for this user from server and notifies the user
   getHistory(){
     String url = globals.url+'/messages/messagesForUser/'+globals.globalLoginResponse.userId;
@@ -134,24 +105,6 @@ class LandingPageState extends State<LandingPage> {
     getUsersForConversation();
   }
 
-//  getHistoryAndUpdateUsers(String response) async {
-//    Iterable list = json.decode(response);
-//    chatList = list.map((model) => ChatMessageModel.fromJson(model)).toList();
-//    for(int i = chatList.length-1; i>=0;i--){
-//      if(historyUsersMap.containsKey(chatList[i].fromId)){
-//        UsersHistory user = historyUsersMap[chatList[i].fromId];
-//        user.numOfMessages+=1; // updating new numberOfMessages
-//        user.lastMessage = chatList[i].fromName+' : '+chatList[i].messageText; // updating new Last message
-//        historyUsersMap.update(chatList[i].fromId, (value) => user);
-//      }
-//      else{
-//        UsersHistory user = UsersHistory(lastMessage: chatList[i].messageText, numOfMessages: 1);
-//        historyUsersMap.putIfAbsent(chatList[i].fromId, () => user);
-//      }
-//    }
-//    await updateHistoryAndGetUsers(chatList, historyUsersMap);
-//    int a = 10;
-//  }
   // ************************************ DATABASE HELPER METHODS START *******************************
 
   // Message arrived when current user is on chat page then update the lastMessage and save the message to chat.
@@ -162,19 +115,6 @@ class LandingPageState extends State<LandingPage> {
     await db.updateUser(user, "conversation");
     getUsersForConversation();
   }
-
-//  // Update older messages to the chat and from user so that it shows up on chat tab for current user
-//  updateHistoryAndGetUsers(List<ChatMessageModel> chats, Map historyUsersMap) async{
-//    var db = new DatabaseHelper();
-//    await db.saveHistoryChat(chats);
-//    int len = chats.length;
-//    if(len>0){
-//      ValidUser user = ValidUser(userId: chats[0].fromId, lastMessage: chats[0].fromName +": "+chats[0].messageText);
-//      await db.updateUsersAndSetMessageNumberCount(historyUsersMap);
-//      historyUsersMap.clear();
-//    }
-//  }
-
   // GET all users which current user has started conversation with from db
   void getUsersForConversation() async {
     var db = new DatabaseHelper();
@@ -199,12 +139,12 @@ class LandingPageState extends State<LandingPage> {
     ValidUser user = ValidUser(userId: userId, numOfMessages: 0);
     await db.updateNumMessageUser(user);
   }
-        // ************************************ DATABASE HELPER METHODS END *******************************
+  // ************************************ DATABASE HELPER METHODS END *******************************
 
   getAllUsersIfNotFetchedAlready(){
     Iterable list;
     readPreference('userList').then((value) => {  // checking if any conversation exists in preferences
-        if(null != value && value.length>0){
+      if(null != value && value.length>0){
         list = json.decode(value),
         validUserList= list.map((model) => ValidUser.fromJson(model)).toList(),
         print(validUserList),
@@ -224,7 +164,6 @@ class LandingPageState extends State<LandingPage> {
       if(response.statusCode == 200){
         setState(() {
           populateValidContactsMap(response.body);
-          //checkForAnyPendingConversationRequest();
           int a =10;
         }),
       }
@@ -237,16 +176,16 @@ class LandingPageState extends State<LandingPage> {
     Iterable list = json.decode(responseBody);
     List<ValidUser> validUserListTemp = list.map((model) => ValidUser.fromJson(model)).toList();
     for(int i=0; i<validUserListTemp.length;i++){
-    ValidUser validUser = validUserListTemp[i];
-    validContactsForThisUserMap.putIfAbsent(validUser.phone, () => validUser);
-    if(validUser.userId == globals.globalLoginResponse.userId){ // updating currUserIndex for current user
-      currUserIndex = i;
+      ValidUser validUser = validUserListTemp[i];
+      validContactsForThisUserMap.putIfAbsent(validUser.phone, () => validUser);
+      if(validUser.userId == globals.globalLoginResponse.userId){ // updating currUserIndex for current user
+        currUserIndex = i;
+      }
     }
+    getContacts();
   }
-  getContacts();
-//validUserList.removeAt(currUserIndex); // removing current user from the list
-}
 
+  // Getting all contacts and matching those with valid users received from server
   Future<void> getContacts() async {
     //Make sure we already have permissions for contacts when we get to this
     //page, so we can just retrieve it
@@ -361,18 +300,6 @@ class LandingPageState extends State<LandingPage> {
       }
     });
   }
-  List parseStringAndFindPhoneNumbers(String responseBody){
-    List<String> phoneNumList = new List();
-    String str = responseBody;
-    while(str.contains("phone")){
-      int ind = str.indexOf("phone");
-      String phoneNum = str.substring(ind+8, ind+18);
-      if(phoneNum!=globals.globalLoginResponse.phone)
-        phoneNumList.add(phoneNum);
-      str = str.substring(ind+20);
-    }
-    return phoneNumList;
-  }
 
   checkForAnyPendingConversationRequest() async{
     Map userWithConversationMap = new Map();
@@ -407,6 +334,7 @@ class LandingPageState extends State<LandingPage> {
     });
   }
 
+  // Populating phone to User userWithConversationMap(conversation enabled users) map and phone to User validUserMap(all valid Users) to be used to compare to pending conversations
   populateLocalUserMaps(Map userWithConversationMap,  Map validUserMap){
     for(int i=0;i<userWithConversationList.length;i++){
       ValidUser validUser = userWithConversationList[i];
@@ -417,18 +345,34 @@ class LandingPageState extends State<LandingPage> {
       validUserMap.putIfAbsent(validUser.phone, () => validUser);
     }
   }
+
+  // Parsing phone numbers from contact object and returning a list of phone numbers.
+  List parseStringAndFindPhoneNumbers(String responseBody){
+    List<String> phoneNumList = new List();
+    String str = responseBody;
+    while(str.contains("phone")){
+      int ind = str.indexOf("phone");
+      String phoneNum = str.substring(ind+8, ind+18);
+      if(phoneNum!=globals.globalLoginResponse.phone)
+        phoneNumList.add(phoneNum);
+      str = str.substring(ind+20);
+    }
+    return phoneNumList;
+  }
+
   // Navigate to new chat screen
   navigateToChatScreen(){
     savePreference('showMessageOnChatTab', 'false');
     globals.showMessageOnChatTab = false;
-    connectSocket();
+    connectSocket(); // updating the status (on/off) of events based on the navigation
     updateNumMessagesToZeroUser(globals.otherUser.userId);
     globals.currentPage="chat";
     Navigator.of(context).push(
         MaterialPageRoute(
           builder: (BuildContext context) => ChatScreen(),
-    )).whenComplete(() => setSocketListenerOn());
+    )).whenComplete(() => onReturnFromChatScreen());
   }
+
   connectSocket() async{
     if(null == globals.Socket.socketUtils.getSocketIO()){
       globals.Socket.socketUtils.connectSocket().then((value) => {
@@ -441,10 +385,14 @@ class LandingPageState extends State<LandingPage> {
   }
 
   // Enabling the listener for messageReceived on landing page so that any new message can be shown to the user.
-  setSocketListenerOn(){
+  onReturnFromChatScreen(){
+    globals.currentPage="landing";
+    globals.Socket.socketUtils.setOffChatMessageReceivedListener();
+    globals.Socket.socketUtils.setOffChatMessageReceivedListenerOld();
+    globals.Socket.socketUtils.setOffUserOnlineStatus();
     globals.Socket.socketUtils.setOnChatMessageReceivedListenerUserPage(onChatMessageReceivedUserPage);
     setState(() {
-      //getHistory();
+      getHistory();
       getUsersForConversation();
     });
   }
@@ -498,7 +446,7 @@ class LandingPageState extends State<LandingPage> {
       showErrorMessage(errorMessage);
     });
   }
-// ******************************* LISTENERS FOR SOCKET END *******************************
+  // ******************************* LISTENERS FOR SOCKET END *******************************
   @override
   Widget build(BuildContext context) {
     TextStyle textStyle = TextStyle(

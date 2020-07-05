@@ -4,16 +4,16 @@ import 'package:fluttertoast/fluttertoast.dart';
 import 'package:flutter/cupertino.dart';
 
 import 'package:flutterapp/models/login_response.dart';
-import 'package:flutterapp/screens/signup_screen.dart';
+import 'package:flutterapp/screens/SignupPage.dart';
 import 'package:flutterapp/globals.dart' as globals;
-import 'package:flutterapp/services/services.dart';
-import 'package:flutterapp/permission/contact.dart';
+import 'package:flutterapp/services/RestServices.dart';
+import 'package:flutterapp/permission/ContactPermission.dart';
 import 'package:flutterapp/models/login.dart';
 import 'package:flutterapp/models/valid_users.dart';
 import 'package:flutterapp/helpers/SocketUtils.dart';
 import 'package:flutterapp/helpers/ErrorMessageHelper.dart';
-import 'package:flutterapp/persistance/shared_preference.dart';
-import 'file:///C:/Users/knowp/AndroidStudioProjects/flutter_app/lib/screens/landingPage.dart';
+import 'package:flutterapp/persistance/SharedPreference.dart';
+import 'file:///C:/Users/knowp/AndroidStudioProjects/flutter_app/lib/screens/LandingPage.dart';
 import 'package:flutterapp/widgets/Dialog.dart';
 import 'package:contacts_service/contacts_service.dart';
 

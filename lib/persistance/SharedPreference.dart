@@ -13,7 +13,3 @@ savePreference(var key, var value) async {
   prefs.setString(key, value);
   print('saved $value');
 }
-
-__adfadfa(){
-
-}

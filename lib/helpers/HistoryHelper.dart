@@ -1,6 +1,6 @@
 import 'package:flutterapp/globals.dart' as globals;
 import 'package:flutterapp/models/valid_users.dart';
-import 'package:flutterapp/services/services.dart';
+import 'package:flutterapp/services/RestServices.dart';
 import 'package:flutterapp/models/message.dart';
 import 'package:flutterapp/helpers/DBHelper.dart';
 import 'dart:convert';

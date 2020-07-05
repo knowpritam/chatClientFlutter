@@ -4,11 +4,10 @@ import 'package:flutterapp/globals.dart' as globals;
 import 'package:flutterapp/models/message.dart';
 import 'package:flutterapp/helpers/DBHelper.dart';
 import 'package:flutterapp/widgets/ChatBubble.dart';
-import 'package:intl/intl.dart';
+import 'package:flutterapp/helpers/DateTimeHelper.dart';
 import 'package:flutterapp/helpers/ErrorMessageHelper.dart';
 import 'package:flutterapp/models/valid_users.dart';
 import 'package:flutterapp/helpers/HistoryHelper.dart';
-import 'package:flutterapp/services/services.dart';
 import 'package:keyboard_visibility/keyboard_visibility.dart';
 
 class ChatScreen extends StatefulWidget {
@@ -16,27 +15,21 @@ class ChatScreen extends StatefulWidget {
   _ChatScreenState createState() => _ChatScreenState();
 }
 
-class _ChatScreenState extends State<ChatScreen> {
+class _ChatScreenState extends State<ChatScreen> with AutomaticKeepAliveClientMixin<ChatScreen>{
 
   TextEditingController _controller = TextEditingController();
   ScrollController _chatLVController = ScrollController(
       initialScrollOffset: 0.0);
   List<ChatMessageModel> messagesModel = new List();
   String errorMessage;
-  // Add variable to top of class
-  Alignment childAlignment = Alignment.center;
+  String onlineStatus ='';
 
   @override
   void initState() {
-    KeyboardVisibilityNotification().addNewListener(
+    KeyboardVisibilityNotification().addNewListener( // On keyboard visible, move the chat list view to top so that the last message is still visible
       onChange: (bool visible) {
         print('keyboard $visible');
         _chatListScrollToBottom();
-        // Add state updating code
-        setState(() {
-          childAlignment = visible ? Alignment.topCenter : Alignment.center;
-
-        });
       },
     );
     super.initState();
@@ -44,14 +37,16 @@ class _ChatScreenState extends State<ChatScreen> {
     if(null == globals.Socket.socketUtils.getSocketIO()){
       globals.Socket.socketUtils.connectSocket();
     }
-    print('adasd');
-    // Registering socket to listen to received message on chat screen
+    _checkOnlineStatus();
     _connectListeners();
-    setState(() {
-      getMessagesAndScrollToEnd();
-    });
+    getMessagesForChat();
+    _chatListScrollToBottom();
   }
 
+  // check onlineStatus
+  _checkOnlineStatus(){
+    globals.Socket.socketUtils.getOnlineStatus(globals.globalLoginResponse.userId, globals.otherUser.userId);
+  }
   // Initializing all connection listeners which will listen to connection state
   _connectListeners(){
     globals.Socket.socketUtils.setConnectListener(onConnect);
@@ -60,13 +55,20 @@ class _ChatScreenState extends State<ChatScreen> {
     globals.Socket.socketUtils.setOnDisconnectListener(onDisconnect);
     globals.Socket.socketUtils.setOnErrorListener(onError);
     globals.Socket.socketUtils.setOnChatMessageReceivedListener(onChatMessageReceived);
+    globals.Socket.socketUtils.setOnChatMessageReceivedListenerOld(onChatMessageReceivedOld);
+    globals.Socket.socketUtils.setOnUserOnlineStatus(onUserOnlineStatus);
   }
 
-  //
-  void getMessagesAndScrollToEnd() async{
-    await getMessagesForChat();
-    _chatListScrollToBottom();
+  // Getting message for this chat
+  Future<List<ChatMessageModel>> getMessagesLocalHistory() async {
+    print("chatId");
+    print(globals.currentConversationId);
+    var db = new DatabaseHelper();
+    var res =  await db.getMessagesForChat(globals.currentConversationId);
+    return res;
   }
+
+  // Handles saving msg to local db and sending message to the server via socket connection
   void _sendMessage() {
     if(globals.online == false){
       errorMessage = "You are disconnected from cloud, please wait or check your network connection";
@@ -94,14 +96,8 @@ class _ChatScreenState extends State<ChatScreen> {
     });
   }
 
-  String getCurrentTime() {
-    var now = new DateTime.now();
-    var formatter = new DateFormat.Hm();
-    String formattedTime = formatter.format(now);
-    return formattedTime;
-  }
 
-  // Listener for any new message received from this user
+  // Listener for any new message received from this user when current user is online
   void onChatMessageReceived(data) {
     setState(() {
       ChatMessageModel chatModel = ChatMessageModel.fromJson(data);
@@ -112,7 +108,37 @@ class _ChatScreenState extends State<ChatScreen> {
       _chatListScrollToBottom();
     });
   }
+// Listener for any older message(current user was offline) received from this user
+  void onChatMessageReceivedOld(data){
+    print('onChatMessageReceivedOld');
+    var chatList = data.map((model) => ChatMessageModel.fromJson(model)).toList();
+    setState(() {
+      for(int i=chatList.length-1;i>=0;i--){
+        ChatMessageModel chatModel = chatList[i];
+        addChatToDb(chatModel);
+        messagesModel.add(chatModel);
+      }
+    });
+    if(chatList.length!=0)
+      updateUserToDb(chatList[0].fromName +": "+chatList[0].messageText);
+    _chatListScrollToBottom();
+    print('onChatMessageReceivedOld');
+  }
 
+  void onUserOnlineStatus(data){
+    setState(() {
+      if(data == null){
+        onlineStatus = 'offline';
+      }
+      else if(data == 'online')
+        onlineStatus = data.toString();
+      else{
+        onlineStatus = convertUTCToIST(data);
+      }
+    });
+  }
+
+  /***********************************************DB Utilities for chat screen start********************************/
   void addChatToDb(ChatMessageModel chatModel) async {
     var db = new DatabaseHelper();
     await db.saveChat(chatModel);
@@ -130,15 +156,13 @@ class _ChatScreenState extends State<ChatScreen> {
   // Getting message for this chat
   void getMessagesForChat() async {
     print("chatId");
-        print(globals.currentConversationId);
-        var db = new DatabaseHelper();
+    print(globals.currentConversationId);
+    var db = new DatabaseHelper();
     db.getMessagesForChat(globals.currentConversationId).then((res) =>
     {
-      if(this.mounted){
-        setState(() {
-          messagesModel = res;
-        }),
-      }
+      setState(() {
+        messagesModel = res;
+      }),
     });
   }
 
@@ -148,6 +172,8 @@ class _ChatScreenState extends State<ChatScreen> {
     ValidUser user = ValidUser(userId:globals.otherUser.userId, lastMessage: message);
     await db.updateUser(user, "chat");
   }
+
+  /***********************************************DB Utilities for chat screen end********************************/
 
   // Scroll the Chat List when it goes to bottom
   _chatListScrollToBottom() {
@@ -162,29 +188,24 @@ class _ChatScreenState extends State<ChatScreen> {
     });
   }
 
-// Gets the chats(when user was offline) for this user from server and notifies the user
-  getHistory(){
-    String url = globals.url+'/messages/messagesForUser/'+globals.globalLoginResponse.userId;
-    int ad = 0;
-    getHistoryChat(url).then((response) => {
-      print(response.body),
-      // If response is not blank i.e. at least one chat message is there on server for this user
-      if(response.statusCode == 200 && response.body != '[]'){
-        deleteHistoryChat(url), // deleting the chat from server once received by client
-        getLocalHistory(response.body),
-      }
+  getLocalHistory(String response) async{
+    List<ChatMessageModel> messages;
+    getHistoryAndUpdateUsers(response);
+    getMessagesLocalHistory().then((value) => {
+      messages = value,
+      setState((){
+        messagesModel = messages;
+      }),
+      _chatListScrollToBottom(),
     });
   }
-
-  getLocalHistory(String response) async{
-    await getHistoryAndUpdateUsers(response);
-    getMessagesAndScrollToEnd();
-  }
-// ******************************* LISTENERS FOR SOCKET START *******************************
+  // ******************************* LISTENERS FOR SOCKET START *******************************
   onConnect(data) {
     print('Connected $data');
-    if(globals.currentPage=="chat")
-      getHistory();
+    if(globals.currentPage=="chat"){
+      globals.Socket.socketUtils.sendUserDetailsForOlderChat(globals.otherUser.userId, globals.globalLoginResponse.userId);
+    }
+
     setState(() {
       globals.online = true;
       print(data);
@@ -229,23 +250,30 @@ class _ChatScreenState extends State<ChatScreen> {
       showErrorMessage(errorMessage);
     });
   }
-// ******************************* LISTENERS FOR SOCKET END *******************************
+  // ******************************* LISTENERS FOR SOCKET END *******************************
 
   @override
   Widget build(BuildContext context) {
-    return WillPopScope(
-      onWillPop: () {
-        globals.currentPage="landing";
-        print('Backbutton pressed (device or appbar button), do whatever you want.');
-        globals.Socket.socketUtils.setOffChatMessageReceivedListener();
-        Navigator.pop(context);
-        //we need to return a future
-        return Future.value(false);
-      },
-      child: Scaffold(
-          resizeToAvoidBottomPadding: true,
-        appBar: AppBar(
-          title: Text(globals.otherUser.firstname),
+    return Scaffold(
+        resizeToAvoidBottomPadding: true,
+        appBar:
+        AppBar(
+          title: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Text(globals.otherUser.firstname),
+              Visibility(
+                visible: true,
+                child: Text(
+                  onlineStatus,
+                  style: TextStyle(
+                    fontSize: 12.0,
+                  ),
+                ),
+              ),
+            ],
+          ),
           backgroundColor: Colors.teal,
           actions: <Widget>[
             Padding(
@@ -264,76 +292,63 @@ class _ChatScreenState extends State<ChatScreen> {
             ),
           ],
         ),
-        body: AnimatedContainer(
-          curve: Curves.easeOut,
-          duration: Duration(
-            milliseconds: 400,
-          ),
-          width: double.infinity,
-          height: double.infinity,
-          //padding: const EdgeInsets.all(20),
-          alignment: Alignment.topCenter,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: <Widget>[
-              Flexible(
-                child: Container(
-                  child: ListView.builder(
-                    shrinkWrap: true,
-                    controller: _chatLVController,
-                    padding: EdgeInsets.all(10.0),
-                    itemCount: messagesModel.length,
-                    itemBuilder: (BuildContext context, int index) {
-                      ChatMessageModel chatMessage = messagesModel[index];
-                      return _chatBubble(
-                        chatMessage,
-                      );
-                    },
-                  ),
+        body: Column(
+          children: <Widget>[
+            Expanded(
+              child: Container(
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  controller: _chatLVController,
+                  padding: EdgeInsets.all(10.0),
+                  itemCount: messagesModel.length,
+                  itemBuilder: (BuildContext context, int index) {
+                    ChatMessageModel chatMessage = messagesModel[index];
+                    return _chatBubble(
+                      chatMessage,
+                    );
+                  },
                 ),
               ),
+            ),
 
-              Container(
-                margin: EdgeInsets.all(10.0),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(25.0),
-                  boxShadow: [
-                    BoxShadow(
-                        offset: Offset(0, 3),
-                        blurRadius: 10,
-                        color: Colors.grey)
-                  ],
-                ),
-                child: Row(
-                  children: <Widget>[
-                    Expanded(
-                      child: TextField(
-                        keyboardType: TextInputType.multiline,
-                        maxLines: null,
-                        controller: _controller,
-                        decoration: InputDecoration(
-                          contentPadding: EdgeInsets.all(15.0),
-                          hintText: 'Enter text',
-                          border: InputBorder.none,
-                        ),
+            Container(
+              margin: EdgeInsets.all(10.0),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(25.0),
+                boxShadow: [
+                  BoxShadow(
+                      offset: Offset(0, 3),
+                      blurRadius: 10,
+                      color: Colors.grey)
+                ],
+              ),
+              child: Row(
+                children: <Widget>[
+                  Expanded(
+                    child: TextField(
+                      keyboardType: TextInputType.multiline,
+                      maxLines: null,
+                      controller: _controller,
+                      decoration: InputDecoration(
+                        contentPadding: EdgeInsets.all(15.0),
+                        hintText: 'Enter text',
+                        border: InputBorder.none,
                       ),
+                    ),
 
-                    ),
-                    FloatingActionButton(
-                      onPressed: _sendMessage,
-                      tooltip: 'Send message',
-                      child: Icon(Icons.send),
-                      backgroundColor: Colors.teal,
-                    ),
-                  ],
-                ),
+                  ),
+                  FloatingActionButton(
+                    onPressed: _sendMessage,
+                    tooltip: 'Send message',
+                    child: Icon(Icons.send),
+                    backgroundColor: Colors.teal,
+                  ),
+                ],
               ),
-            ],
-          ),
+            ),
+          ],
         ),
-
-      ),
     );
   }
 
@@ -400,6 +415,10 @@ class _ChatScreenState extends State<ChatScreen> {
       ),
     );
   }
+
+  @override
+  // TODO: implement wantKeepAlive
+  bool get wantKeepAlive => true;
 }
 List<IconData> icons = [
   Icons.image,

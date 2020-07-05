@@ -42,6 +42,7 @@ class SocketUtils {
     print("Socket status: " + data);
   }
 
+  // ******************* Subscribing to EVENTS start***********************************//
   setOnChatMessageReceivedListener(Function onChatMessageReceived) {
     socketIO.on('chat_direct', (data) {
       print("Received $data");
@@ -56,6 +57,22 @@ class SocketUtils {
     });
   }
 
+  setOnChatMessageReceivedListenerOld(Function onChatMessageReceivedOld) {
+    socketIO.on('chat_direct_old', (data) {
+      print("Received $data");
+      onChatMessageReceivedOld(data);
+    });
+  }
+
+  setOnUserOnlineStatus(Function onUserOnlineStatus) {
+    socketIO.on('user_online_status', (data) {
+      print("Received $data");
+      onUserOnlineStatus(data);
+    });
+  }
+  // ******************* Subscribing to EVENTS end***********************************//
+
+  // ******************* UnSubscribing to EVENTS start***********************************//
   setOffChatMessageReceivedListenerUserPage() {
     socketIO.off('chat_indirect', (data) {
       print("Received $data");
@@ -66,6 +83,18 @@ class SocketUtils {
       print("Received $data");
     });
   }
+  setOffChatMessageReceivedListenerOld() {
+    socketIO.off('chat_direct_old', (data) {
+      print("Received $data");
+    });
+  }
+  setOffUserOnlineStatus() {
+    socketIO.off('user_online_status', (data) {
+      print("Received $data");
+    });
+  }
+  // ******************* UnSubscribing to EVENTS start***********************************//
+
   setOnMessageBackFromServer(Function onMessageBackFromServer) {
     if (socketIO != null) {
       socketIO.on('chat_direct', (data) {
@@ -78,6 +107,19 @@ class SocketUtils {
   void sendChatMessage( ChatMessageModel chat) async {
     if (socketIO != null) {
       socketIO.emit("chat_direct", [chat.toJson()]);
+    }
+  }
+  void getOnlineStatus(String fromId, String toId) async {
+    if (socketIO != null) {
+      ChatMessageModel chat = ChatMessageModel(fromId: fromId, toId: toId);
+      socketIO.emit("user_online_status", [chat.toJson()]);
+    }
+  }
+
+  void sendUserDetailsForOlderChat(String fromId, String toId) async {
+    if (socketIO != null) {
+      ChatMessageModel chat = ChatMessageModel(fromId: fromId, toId: toId);
+      socketIO.emit("chat_direct_old", [chat.toJson()]);
     }
   }
 

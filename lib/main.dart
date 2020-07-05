@@ -2,10 +2,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutterapp/models/login_response.dart';
-import 'package:flutterapp/persistance/shared_preference.dart';
+import 'package:flutterapp/persistance/SharedPreference.dart';
 import 'package:flutterapp/globals.dart' as globals;
-import 'file:///C:/Users/knowp/AndroidStudioProjects/flutter_app/lib/screens/landingPage.dart';
-import 'file:///C:/Users/knowp/AndroidStudioProjects/flutter_app/lib/screens/login_page.dart';
+import 'file:///C:/Users/knowp/AndroidStudioProjects/flutter_app/lib/screens/LandingPage.dart';
+import 'file:///C:/Users/knowp/AndroidStudioProjects/flutter_app/lib/screens/LoginPage.dart';
 
 void main() {
   runApp(MaterialApp(
