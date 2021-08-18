@@ -74,6 +74,7 @@ class LandingPageState extends State<LandingPage> {
     globals.Socket.socketUtils.setOnDisconnectListener(onDisconnect);
     globals.Socket.socketUtils.setOnErrorListener(onError);
     globals.Socket.socketUtils.setOnChatMessageReceivedListenerUserPage(onChatMessageReceivedUserPage);
+    globals.Socket.socketUtils.setOnBulkMessagesDelivered(onBulkMessagesDelivered);
   }
 
   // Listens to any new message which is received by this user and updated the message and notify user
@@ -85,7 +86,8 @@ class LandingPageState extends State<LandingPage> {
     });
   }
 
-
+  void onBulkMessagesDelivered(){
+  }
   // Gets the chats(when user was offline) for this user from server and notifies the user
   getHistory(){
     String url = globals.url+'/messages/messagesForUser/'+globals.globalLoginResponse.userId;
@@ -112,7 +114,7 @@ class LandingPageState extends State<LandingPage> {
     var db = new DatabaseHelper();
     await  db.saveChat(chatModel);
     ValidUser user = ValidUser(userId: chatModel.fromId, lastMessage: chatModel.fromName +": "+chatModel.messageText);
-    await db.updateUser(user, "conversation");
+    await db.updateUser(user, "conversation", false);
     getUsersForConversation();
   }
   // GET all users which current user has started conversation with from db
@@ -326,7 +328,7 @@ class LandingPageState extends State<LandingPage> {
           }
         },
         if(pendingUserList.length==0){
-          Navigator.of(_keyLoader.currentContext,rootNavigator: true).pop(),//close the dialog
+          Navigator.of(_keyLoader.currentContext,rootNavigator: false).pop(),//close the dialog
           errorMessage = "No pending conversations found from your contact list",
           showErrorMessage(errorMessage),
         }
@@ -390,7 +392,11 @@ class LandingPageState extends State<LandingPage> {
     globals.Socket.socketUtils.setOffChatMessageReceivedListener();
     globals.Socket.socketUtils.setOffChatMessageReceivedListenerOld();
     globals.Socket.socketUtils.setOffUserOnlineStatus();
+    globals.Socket.socketUtils.setOffMessageDelivered();
+    globals.Socket.socketUtils.setOffBulkMessagesDelivered();
+    globals.Socket.socketUtils.setOnBulkMessagesDelivered(onBulkMessagesDelivered);
     globals.Socket.socketUtils.setOnChatMessageReceivedListenerUserPage(onChatMessageReceivedUserPage);
+    globals.Socket.socketUtils.clearInConverstionStatus(globals.globalLoginResponse.userId, globals.otherUser.userId);
     setState(() {
       getHistory();
       getUsersForConversation();
@@ -406,7 +412,7 @@ class LandingPageState extends State<LandingPage> {
       globals.online = true;
       print(data);
       errorMessage = "Connected to cloud";
-      showErrorMessage(errorMessage);
+      //showErrorMessage(errorMessage);
     });
   }
 
@@ -443,7 +449,7 @@ class LandingPageState extends State<LandingPage> {
       globals.online = false;
       print(data);
       errorMessage = "Disconnected from cloud";
-      showErrorMessage(errorMessage);
+      //showErrorMessage(errorMessage);
     });
   }
   // ******************************* LISTENERS FOR SOCKET END *******************************

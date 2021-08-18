@@ -8,13 +8,15 @@ import 'package:contacts_service/contacts_service.dart';
 
 bool isLoggedIn = false;
 LoginResponse globalLoginResponse = LoginResponse();
-String url = 'https://gentle-bayou-08991.herokuapp.com';
+//String url = 'https://gentle-bayou-08991.herokuapp.com';
+String url = 'http://192.168.145.128:8080';
 String currentConversationId;
 bool showMessageOnChatTab;
 bool online = true;
 Iterable<Contact> contacts = null;
 String currentPage = "";
-
+bool receivedOldMessages = false;
+String notifToken;
 
 ValidUser loggedInUser;
 ValidUser otherUser;

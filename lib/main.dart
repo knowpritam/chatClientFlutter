@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutterapp/models/login_response.dart';
 import 'package:flutterapp/persistance/SharedPreference.dart';
+import 'package:flutterapp/services/PushNotification.dart';
 import 'package:flutterapp/globals.dart' as globals;
 import 'file:///C:/Users/knowp/AndroidStudioProjects/flutter_app/lib/screens/LandingPage.dart';
 import 'file:///C:/Users/knowp/AndroidStudioProjects/flutter_app/lib/screens/LoginPage.dart';
@@ -26,6 +27,13 @@ class _State extends State<MyApp> {
 
   @override
   void initState() {
+    new PushNotificationsManager().init();
+    readPreference('notifToken').then((value) => {  // checking if any conversation exists in preferences
+      if(null != value && value.length>0){
+        globals.notifToken = value,
+        //checkForAnyPendingConversationRequest(),
+      }
+    });
     LoginResponse loginResponse;
     readPreference('showMessageOnChatTab').then((value) =>{
       if(value=='true') {
@@ -37,6 +45,7 @@ class _State extends State<MyApp> {
     readPreference('loginResponse').then((loginPref) => {
       if(null != loginPref){
         loginResponse = postFromJson(loginPref),
+        loginResponse.notifToken = globals.notifToken,
         globals.globalLoginResponse = loginResponse,
         if(loginResponse.token != null){
           // User already logged in

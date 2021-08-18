@@ -7,7 +7,6 @@ import 'package:flutterapp/widgets/ChatBubble.dart';
 import 'package:flutterapp/helpers/DateTimeHelper.dart';
 import 'package:flutterapp/helpers/ErrorMessageHelper.dart';
 import 'package:flutterapp/models/valid_users.dart';
-import 'package:flutterapp/helpers/HistoryHelper.dart';
 import 'package:keyboard_visibility/keyboard_visibility.dart';
 
 class ChatScreen extends StatefulWidget {
@@ -21,6 +20,7 @@ class _ChatScreenState extends State<ChatScreen> with AutomaticKeepAliveClientMi
   ScrollController _chatLVController = ScrollController(
       initialScrollOffset: 0.0);
   List<ChatMessageModel> messagesModel = new List();
+  Map<int, int> messageIdToMessageMap = new Map();
   String errorMessage;
   String onlineStatus ='';
 
@@ -57,16 +57,11 @@ class _ChatScreenState extends State<ChatScreen> with AutomaticKeepAliveClientMi
     globals.Socket.socketUtils.setOnChatMessageReceivedListener(onChatMessageReceived);
     globals.Socket.socketUtils.setOnChatMessageReceivedListenerOld(onChatMessageReceivedOld);
     globals.Socket.socketUtils.setOnUserOnlineStatus(onUserOnlineStatus);
+    globals.Socket.socketUtils.setOnMessageDelivered(onMessageDelivered);
+    globals.Socket.socketUtils.setOnBulkMessagesDelivered(onBulkMessageDelivered);
   }
 
-  // Getting message for this chat
-  Future<List<ChatMessageModel>> getMessagesLocalHistory() async {
-    print("chatId");
-    print(globals.currentConversationId);
-    var db = new DatabaseHelper();
-    var res =  await db.getMessagesForChat(globals.currentConversationId);
-    return res;
-  }
+
 
   // Handles saving msg to local db and sending message to the server via socket connection
   void _sendMessage() {
@@ -83,35 +78,48 @@ class _ChatScreenState extends State<ChatScreen> with AutomaticKeepAliveClientMi
           fromName: globals.globalLoginResponse.firstname,
           toName: globals.otherUser.firstname,
           messageText: _controller.text,
+          status: "sent",
           timeStamp: getCurrentTime()
       );
+      //messageIdToMessageMap.putIfAbsent(key, () => null)
       if (_controller.text.isNotEmpty) {
-        addChatToDb(chatModel);
-        updateUserToDb("You : "+_controller.text);
-        globals.Socket.socketUtils.sendChatMessage(chatModel);
         messagesModel.add(chatModel);
-        _controller.text = "";
+        addChatToDb(chatModel).then((value) => {
+          chatModel.messageId = value,
+          messageIdToMessageMap.putIfAbsent(value, () => messagesModel.length-1),
+          updateUserToDb("You : "+_controller.text, globals.globalLoginResponse.userId),
+          _controller.text = "",
+          globals.Socket.socketUtils.sendChatMessage(chatModel),
+
+        });
+
         _chatListScrollToBottom();
       }
     });
   }
-
 
   // Listener for any new message received from this user when current user is online
   void onChatMessageReceived(data) {
     setState(() {
       ChatMessageModel chatModel = ChatMessageModel.fromJson(data);
       addChatToDb(chatModel);
-      updateUserToDb(chatModel.fromName +": "+chatModel.messageText);
+      updateUserToDb(chatModel.fromName +": "+chatModel.messageText, chatModel.fromId);
       print(data);
-      messagesModel.add(chatModel);
-      _chatListScrollToBottom();
+      if(chatModel.fromId == globals.otherUser.userId){
+        messagesModel.add(chatModel);
+        _chatListScrollToBottom();
+      }
+
     });
   }
 // Listener for any older message(current user was offline) received from this user
   void onChatMessageReceivedOld(data){
     print('onChatMessageReceivedOld');
     var chatList = data.map((model) => ChatMessageModel.fromJson(model)).toList();
+    if(chatList.length>0){
+      ChatMessageModel chatModel = chatList[0];
+      globals.Socket.socketUtils.sendDeliveredBulkNotif(chatModel.toId, chatModel.fromId);
+    }
     setState(() {
       for(int i=chatList.length-1;i>=0;i--){
         ChatMessageModel chatModel = chatList[i];
@@ -120,7 +128,7 @@ class _ChatScreenState extends State<ChatScreen> with AutomaticKeepAliveClientMi
       }
     });
     if(chatList.length!=0)
-      updateUserToDb(chatList[0].fromName +": "+chatList[0].messageText);
+      updateUserToDb(chatList[0].fromName +": "+chatList[0].messageText, chatList[0].fromId);
     _chatListScrollToBottom();
     print('onChatMessageReceivedOld');
   }
@@ -138,10 +146,23 @@ class _ChatScreenState extends State<ChatScreen> with AutomaticKeepAliveClientMi
     });
   }
 
-  /***********************************************DB Utilities for chat screen start********************************/
-  void addChatToDb(ChatMessageModel chatModel) async {
+  void onMessageDelivered(data){
+    ChatMessageModel chatModel = ChatMessageModel.fromJson(data);
     var db = new DatabaseHelper();
-    await db.saveChat(chatModel);
+    db.updateChatMessageStatus(chatModel);
+    setState(() {
+      messagesModel[messageIdToMessageMap[chatModel.messageId]].status="delivered";
+    });
+  }
+
+  void onBulkMessageDelivered(){
+    getMessagesForChat();
+  }
+
+  /***********************************************DB Utilities for chat screen start********************************/
+  Future<int> addChatToDb(ChatMessageModel chatModel) async {
+    var db = new DatabaseHelper();
+    return await db.saveChat(chatModel);
   }
 
   // Removing chats from local DB -- Chats are not stored on server so this is irreversible
@@ -167,10 +188,10 @@ class _ChatScreenState extends State<ChatScreen> with AutomaticKeepAliveClientMi
   }
 
   // Update last message to user which will be shown on the chat tab
-  void updateUserToDb(String message) async {
+  void updateUserToDb(String message, String fromId) async {
     var db = new DatabaseHelper();
-    ValidUser user = ValidUser(userId:globals.otherUser.userId, lastMessage: message);
-    await db.updateUser(user, "chat");
+    ValidUser user = ValidUser(userId:fromId, lastMessage: message);
+    await fromId==globals.otherUser.userId ? db.updateUser(user, "chat", true) : db.updateUser(user, "chat", false);
   }
 
   /***********************************************DB Utilities for chat screen end********************************/
@@ -188,29 +209,18 @@ class _ChatScreenState extends State<ChatScreen> with AutomaticKeepAliveClientMi
     });
   }
 
-  getLocalHistory(String response) async{
-    List<ChatMessageModel> messages;
-    getHistoryAndUpdateUsers(response);
-    getMessagesLocalHistory().then((value) => {
-      messages = value,
-      setState((){
-        messagesModel = messages;
-      }),
-      _chatListScrollToBottom(),
-    });
-  }
   // ******************************* LISTENERS FOR SOCKET START *******************************
   onConnect(data) {
     print('Connected $data');
     if(globals.currentPage=="chat"){
       globals.Socket.socketUtils.sendUserDetailsForOlderChat(globals.otherUser.userId, globals.globalLoginResponse.userId);
     }
-
+    _checkOnlineStatus();
     setState(() {
       globals.online = true;
       print(data);
       errorMessage = "Connected to cloud";
-      showErrorMessage(errorMessage);
+      //showErrorMessage(errorMessage);
     });
   }
 
@@ -247,7 +257,7 @@ class _ChatScreenState extends State<ChatScreen> with AutomaticKeepAliveClientMi
       globals.online = false;
       print(data);
       errorMessage = "Disconnected from cloud";
-      showErrorMessage(errorMessage);
+      //showErrorMessage(errorMessage);
     });
   }
   // ******************************* LISTENERS FOR SOCKET END *******************************
@@ -338,6 +348,11 @@ class _ChatScreenState extends State<ChatScreen> with AutomaticKeepAliveClientMi
                     ),
 
                   ),
+                  Icon(
+                    Icons.attach_file,
+                    size: 30,
+                    color: Colors.teal
+                  ),
                   FloatingActionButton(
                     onPressed: _sendMessage,
                     tooltip: 'Send message',
@@ -359,13 +374,16 @@ class _ChatScreenState extends State<ChatScreen> with AutomaticKeepAliveClientMi
     fromMe ? Alignment.topRight : Alignment.topLeft;
     TextStyle textStyle = TextStyle(
       fontSize: 16.0,
-      color: fromMe ? Colors.white : Colors.black54,
+      color: fromMe ? Colors.white : Colors.black,
     );
     TextStyle timeStyle = TextStyle(
       fontSize: 10.0,
-      color: fromMe ? Colors.white : Colors.black54,
+      color: fromMe ? Colors.white : Colors.black,
     );
+
+
     Color chatBgColor = fromMe ? Colors.teal : Colors.black12;
+    Color tickColor = fromMe ? Colors.white : Colors.black12;
     EdgeInsets edgeInsets = fromMe
         ? EdgeInsets.fromLTRB(0, 15, 15, 5)
         : EdgeInsets.fromLTRB(10, 15, 5, 5);
@@ -373,8 +391,11 @@ class _ChatScreenState extends State<ChatScreen> with AutomaticKeepAliveClientMi
         ? EdgeInsets.fromLTRB(80, 5, 0, 5)
         : EdgeInsets.fromLTRB(0, 5, 80, 5);
     EdgeInsets edgeInsetsTime = fromMe
-        ? EdgeInsets.fromLTRB(0, 0, 0, 0)
-        : EdgeInsets.fromLTRB(10, 0, 0, 0);
+        ? EdgeInsets.fromLTRB(0, 2, 0, 0)
+        : EdgeInsets.fromLTRB(10, 2, 0, 0);
+    EdgeInsets edgeInsetsStatus1 = fromMe
+        ? EdgeInsets.fromLTRB(30, 0, 0, 10)
+        : EdgeInsets.fromLTRB(40, 0, 0, 10);
 
     return Container(
       margin: margins,
@@ -389,27 +410,53 @@ class _ChatScreenState extends State<ChatScreen> with AutomaticKeepAliveClientMi
                 alignment: chatArrowAlignment,
               ),
               child: Container(
-                margin: EdgeInsets.fromLTRB(10, 10, 10, 10),
-                child: Stack(
+                margin: EdgeInsets.fromLTRB(10, 6, 10, 6),
+                child:Wrap(
                   children: <Widget>[
-                    Padding(
-                      padding: edgeInsets,
-                      child: Text(
-                        chatMessageModel.messageText,
-                        style: textStyle,
-                      ),
+                    Stack(
+                      children: <Widget>[
+                        Padding(
+                          padding: edgeInsets,
+                          child: Text(
+                            chatMessageModel.messageText,
+                            style: textStyle,
+                          ),
+                        ),
+                        Padding(
+                          padding: edgeInsetsTime,
+                          child: Text(
+                            chatMessageModel.timeStamp,
+                            style: timeStyle,
+                          ),
+                        ),
+                        Container(
+                          margin: edgeInsetsStatus1,
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: <Widget>[
+                              if(chatMessageModel.status=='sent' && fromMe)
+                              Icon(
+                                Icons.done,
+                                size: 14,
+                                color:tickColor,
+                              ),
+                              if(chatMessageModel.status=='delivered' && fromMe)
+                                Icon(
+                                  Icons.done_all,
+                                  size: 14,
+                                  color:tickColor,
+                                ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
-                    Padding(
-                      padding: edgeInsetsTime,
-                      child: Text(
-                        chatMessageModel.timeStamp,
-                        style: timeStyle,
-                      ),
-                    ),
+
                   ],
                 ),
               ),
             ),
+
           ],
         ),
       ),

@@ -1,6 +1,5 @@
 import 'package:flutterapp/globals.dart' as globals;
 import 'package:flutterapp/models/valid_users.dart';
-import 'package:flutterapp/services/RestServices.dart';
 import 'package:flutterapp/models/message.dart';
 import 'package:flutterapp/helpers/DBHelper.dart';
 import 'dart:convert';
@@ -23,6 +22,7 @@ getHistoryAndUpdateUsers(String response) async {
     else{
       UsersHistory user = UsersHistory(lastMessage: chatList[i].messageText, numOfMessages: 1);
       historyUsersMap.putIfAbsent(chatList[i].fromId, () => user);
+      globals.Socket.socketUtils.sendDeliveredBulkNotif(chatList[i].toId, chatList[i].fromId);
     }
   }
   await updateHistoryAndGetUsers(chatList, historyUsersMap);

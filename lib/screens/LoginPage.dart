@@ -52,6 +52,7 @@ class LoginPageState extends State<LoginPage> {
         globals.showMessageOnChatTab= true,
         loginResponse = postFromJson(response.body),
         globals.globalLoginResponse = loginResponse,
+        globals.globalLoginResponse.notifToken = globals.notifToken,
         loggedInUser = new ValidUser(userId: loginResponse.userId, firstname: loginResponse.firstname, lastname: loginResponse.lastname,
              username: loginResponse.firstname, phone: "2"),
         globals.loggedInUser = loggedInUser,

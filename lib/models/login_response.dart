@@ -13,8 +13,9 @@ class LoginResponse {
   final String lastname;
   final String phone;
   final bool isSuccess;
+  String notifToken;
 
-  LoginResponse({this.userId, this.token, this.firstname, this.lastname,this.phone, this.isSuccess});
+  LoginResponse({this.userId, this.token, this.firstname, this.lastname,this.phone, this.isSuccess, this.notifToken});
 
   factory LoginResponse.fromJson(Map<String, dynamic> json) {
     return LoginResponse(
@@ -24,10 +25,12 @@ class LoginResponse {
       lastname: json['lastname'],
       phone: json['phone'],
       isSuccess: json['success'],
+      notifToken: json['notifToken'],
     );
   }
   Map<String, dynamic> toJson() => {
     "userId": userId,
+    "notifToken" : notifToken,
   };
   LoginResponse postFromJson(String str) {
     final jsonData = json.decode(str);

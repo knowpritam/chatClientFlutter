@@ -4,6 +4,8 @@ import 'package:adhara_socket_io/adhara_socket_io.dart';
 //import 'package:flutter_socket_io/socket_io_manager.dart';
 import 'package:flutterapp/models/message.dart';
 import 'package:flutterapp/globals.dart' as globals;
+import 'package:flutterapp/helpers/DbUtil.dart';
+
 
 class SocketUtils {
   //
@@ -24,7 +26,7 @@ class SocketUtils {
     final Map<String, String> userMap = {
     };
     return SocketOptions(
-      "https://gentle-bayou-08991.herokuapp.com",
+      "http://192.168.145.128:8080",
       enableLogging: true,
       transports: [Transports.WEB_SOCKET],
       query: userMap,
@@ -70,6 +72,21 @@ class SocketUtils {
       onUserOnlineStatus(data);
     });
   }
+
+  setOnMessageDelivered(Function onMessageDelivered) {
+    socketIO.on('msg_delivered', (data) {
+      print("Received $data");
+      onMessageDelivered(data);
+    });
+  }
+
+  setOnBulkMessagesDelivered(Function onBulkMessagesDelivered) {
+    socketIO.on('msg_delivered_bulk', (data) {
+      print("Received $data");
+      updateMessagesBulkToDelivered(data, onBulkMessagesDelivered);
+      //onBulkMessagesDelivered();
+    });
+  }
   // ******************* Subscribing to EVENTS end***********************************//
 
   // ******************* UnSubscribing to EVENTS start***********************************//
@@ -93,6 +110,18 @@ class SocketUtils {
       print("Received $data");
     });
   }
+
+  setOffMessageDelivered() {
+    socketIO.off('msg_delivered', (data) {
+      print("Received $data");
+    });
+  }
+
+  setOffBulkMessagesDelivered() {
+    socketIO.off('msg_delivered_bulk', (data) {
+      print("Received $data");
+    });
+  }
   // ******************* UnSubscribing to EVENTS start***********************************//
 
   setOnMessageBackFromServer(Function onMessageBackFromServer) {
@@ -101,9 +130,7 @@ class SocketUtils {
         onMessageBackFromServer(data);
       });
     }
-
   }
-
   void sendChatMessage( ChatMessageModel chat) async {
     if (socketIO != null) {
       socketIO.emit("chat_direct", [chat.toJson()]);
@@ -113,6 +140,20 @@ class SocketUtils {
     if (socketIO != null) {
       ChatMessageModel chat = ChatMessageModel(fromId: fromId, toId: toId);
       socketIO.emit("user_online_status", [chat.toJson()]);
+    }
+  }
+
+  void clearInConverstionStatus(String fromId, String toId) async {
+    if (socketIO != null) {
+      ChatMessageModel chat = ChatMessageModel(fromId: fromId, toId: toId);
+      socketIO.emit("user_in_conversation_status_clear", [chat.toJson()]);
+    }
+  }
+
+  void sendDeliveredBulkNotif(String toId, String fromId) async {
+    if (socketIO != null) {
+      ChatMessageModel chat = ChatMessageModel(toId: toId, fromId: fromId);
+      socketIO.emit("msg_delivered_bulk", [chat.toJson()]);
     }
   }
 
